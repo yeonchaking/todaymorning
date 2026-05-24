@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 서울 버스 API -->
+        <domain includeSubdomains="true">ws.bus.go.kr</domain>
+        <!-- 서울 지하철 API -->
+        <domain includeSubdomains="true">swopenapi.seoul.go.kr</domain>
+    </domain-config>
+</network-security-config>
