@@ -3,8 +3,8 @@ package com.yeon.todaymorning.ui.timeattack
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
-import com.yeon.todaymorning.data.db.MissionDao
 import com.yeon.todaymorning.data.db.MissionRecord
+import com.yeon.todaymorning.data.repository.MissionRepository
 import com.yeon.todaymorning.data.repository.TransitRepository
 import com.yeon.todaymorning.domain.model.MissionState
 import com.yeon.todaymorning.domain.model.TransitArrival
@@ -27,7 +27,7 @@ import javax.inject.Inject
 class TimeAttackViewModel @Inject constructor(
     private val transitRepository: TransitRepository,
     private val dataStore: UserSettingsDataStore,
-    private val missionDao: MissionDao
+    private val missionRepository: MissionRepository
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> = dataStore.userSettings.stateIn(
@@ -132,7 +132,7 @@ class TimeAttackViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now)
             val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
-            missionDao.insert(
+            missionRepository.insertTodayResult(
                 MissionRecord(
                     date = dateStr,
                     alarmTime = "%02d:%02d".format(s.alarmHour, s.alarmMinute),
@@ -151,7 +151,7 @@ class TimeAttackViewModel @Inject constructor(
             val s = settings.value
             val now = System.currentTimeMillis()
             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now)
-            missionDao.insert(
+            missionRepository.insertTodayResult(
                 MissionRecord(
                     date = dateStr,
                     alarmTime = "%02d:%02d".format(s.alarmHour, s.alarmMinute),
