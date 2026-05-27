@@ -1,9 +1,13 @@
 package com.yeon.todaymorning.data.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "mission_records")
+@Entity(
+    tableName = "mission_records",
+    indices = [Index(value = ["date"], unique = true)]
+)
 data class MissionRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: String,           // "2026-04-20" 형식
