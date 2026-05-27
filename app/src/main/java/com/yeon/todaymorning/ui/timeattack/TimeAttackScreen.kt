@@ -20,7 +20,7 @@ import kotlin.math.abs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeAttackScreen(
-    onMissionDone: () -> Unit,
+    onMissionComplete: (isSuccess: Boolean) -> Unit,
     viewModel: TimeAttackViewModel = hiltViewModel()
 ) {
     val arrivals by viewModel.arrivals.collectAsState()
@@ -30,11 +30,11 @@ fun TimeAttackScreen(
     val remainingSeconds by viewModel.remainingSeconds.collectAsState()
     val settings by viewModel.settings.collectAsState()
 
-    // 미션 종료 시 메인으로 복귀
+    // 미션 종료 시 결과 화면으로 이동
     LaunchedEffect(missionState) {
         if (missionState == MissionState.Success || missionState == MissionState.Failed) {
-            kotlinx.coroutines.delay(2000L)
-            onMissionDone()
+            kotlinx.coroutines.delay(600L) // 상태 변화를 잠깐 보여주고 이동
+            onMissionComplete(missionState == MissionState.Success)
         }
     }
 
