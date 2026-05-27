@@ -249,8 +249,4 @@ private fun motivationMessage(streak: Int): String = when {
     streak >= 60 -> "두 달 연속! 당신은 진짜 출근 레전드예요 👑"
     streak >= 30 -> "한 달 연속! 이 습관, 평생 갑니다 💎"
     streak >= 14 -> "2주 연속! 완전히 습관이 됐어요 🥇"
-    streak >= 7  -> "일주일 연속! 이번 주도 완벽했어요 🥈"
-    streak >= 3  -> "${streak}일 연속! 좋은 흐름이에요 🥉"
-    streak == 1  -> "오늘 첫 성공! 내일도 화이팅 🌱"
-    else         -> "잘하고 있어요!"
-}
+    st

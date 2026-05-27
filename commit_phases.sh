@@ -58,8 +58,4 @@ git add \
   app/build.gradle.kts
 
 git commit -m "Phase 6 — 안정화 (중복 기록 방지, DB 마이그레이션, ProGuard, release 빌드)"
-echo "Phase 6 커밋 완료"
-
-echo ""
-echo "=== 전체 완료! ==="
-git log --oneline -8
+echo "Phase 6 커밋 완료"

@@ -54,4 +54,4 @@
 -keep class com.yeon.todaymorning.alarm.** { *; }
 
 # ── 앱 전체 도메인 모델 ────────────────────────────────────────
--keep class com.yeon.todaymorning.domain.model.** { *; }
+-
