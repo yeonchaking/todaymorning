@@ -21,4 +21,7 @@ enum class UserLevel(
         fun daysToNextLevel(streak: Int): Int? {
             val current = fromStreak(streak)
             val next = entries.getOrNull(current.ordinal + 1) ?: return null
-            return next.minStreak - st
+            return next.minStreak - streak
+        }
+    }
+}

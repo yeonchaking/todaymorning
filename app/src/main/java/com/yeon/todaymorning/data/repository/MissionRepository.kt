@@ -69,4 +69,6 @@ class MissionRepository @Inject constructor(
         dao.getSuccessCount(),
         dao.getTotalCount()
     ) { success, total ->
-     
+        if (total == 0) 0f else success.toFloat() / total
+    }
+}

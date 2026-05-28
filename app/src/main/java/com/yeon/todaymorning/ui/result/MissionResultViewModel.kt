@@ -35,4 +35,8 @@ class MissionResultViewModel @Inject constructor(
             _uiState.value = ResultUiState(
                 streak = streak,
                 level = UserLevel.fromStreak(streak),
-                daysToNext = UserLevel.daysToNextLevel(str
+                daysToNext = UserLevel.daysToNextLevel(streak)
+            )
+        }
+    }
+}

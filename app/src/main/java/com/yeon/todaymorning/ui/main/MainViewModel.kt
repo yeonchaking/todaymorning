@@ -69,4 +69,7 @@ class MainViewModel @Inject constructor(
     fun refreshStreak() {
         viewModelScope.launch {
             val streak = repository.getCurrentStreak()
-            _
+            _uiState.value = _uiState.value.copy(streak = streak)
+        }
+    }
+}

@@ -64,4 +64,9 @@ fun NavGraph(
                 onNavigateToMain = {
                     navController.navigate(Routes.MAIN) {
                         popUpTo(0) { inclusive = true }
-      
+                    }
+                }
+            )
+        }
+    }
+}
