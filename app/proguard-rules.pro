@@ -54,4 +54,13 @@
 -keep class com.yeon.todaymorning.alarm.** { *; }
 
 # ── 앱 전체 도메인 모델 ────────────────────────────────────────
--
+-keep class com.yeon.todaymorning.domain.model.** { *; }
+
+# ── 카카오맵 SDK ──────────────────────────────────────────────
+-keep class com.kakao.vectormap.** { *; }
+-keep interface com.kakao.vectormap.**
+-dontwarn com.kakao.vectormap.**
+
+# ── Google Play Services (위치) ───────────────────────────────
+-keep class com.google.android.gms.location.** { *; }
+-dontwarn com.google.android.gms.**

@@ -35,6 +35,7 @@ android {
 
         buildConfigField("String", "BUS_API_KEY", "\"${localProps["BUS_API_KEY"] ?: ""}\"")
         buildConfigField("String", "SUBWAY_API_KEY", "\"${localProps["SUBWAY_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"${localProps["KAKAO_NATIVE_APP_KEY"] ?: ""}\"")
     }
 
     buildTypes {
@@ -106,6 +107,10 @@ dependencies {
 
     // Lottie
     implementation(libs.lottie.compose)
+
+    // 카카오맵 + 위치
+    implementation(libs.kakao.map)
+    implementation(libs.play.services.location)
 
     // Test
     testImplementation(libs.junit)

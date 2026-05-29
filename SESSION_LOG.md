@@ -5,6 +5,39 @@
 
 ---
 
+## [2026-05-29] 지도 기반 버스 선택 UX 구현 (카카오맵)
+
+**목표:** 정류장/노선 ID 직접입력 UX를 지도 기반 검색·선택으로 전면 교체 + 핵심 루프 완성
+
+**결정 사항:**
+- 지도 SDK는 **카카오맵 v2** (`com.kakao.maps.open:android`). 네이버는 종량제라 회피. 키 해시 등록 필수.
+- 버스 데이터는 서울 `ws.bus.go.kr` 공개 API: `getStationByPos`(주변), `getStationByName`(검색), `getStationByUid`(경유노선+도착). 지하철은 v1 비활성(자리만).
+
+**작업 결과:**
+- 빌드: settings/libs/app gradle에 카카오맵+location 의존성, `KAKAO_NATIVE_APP_KEY` BuildConfig, Application에서 `KakaoMapSdk.init`, 위치 권한, ProGuard 규칙.
+- 데이터: `StationDtos.kt`(DTO 3종), `BusApiService` 검색 메서드 2개, `TransitRepository.nearbyBusStops/searchBusStops/getRoutesAtStop`.
+- 모델: `BusStop`/`BusRouteOption`, `UserSettings`에 표시이름 필드(busStopName/busRouteName/busDirection)+`hasBus`, DataStore 키 확장.
+- UI: `ui/busselect/BusSelectScreen`+`BusSelectViewModel`(카카오 MapView·검색바·내주변 GPS·라벨핀·노선 바텀시트), `SettingsScreen` ID칸 제거→지도선택 버튼+요약카드, `NavGraph` bus_select 라우트+savedStateHandle 결과반환.
+- 루프: `AlarmScheduler.scheduleMissionFailAt`로 목표시각 자동실패 알람을 `SettingsViewModel` 저장 시 등록(기존 MissionFailReceiver 연결).
+
+**빌드/실기기 검증 진행 상황 (2026-05-30 새벽):**
+- ✅ 빌드 성공. `getStationByName` 호출부 파라미터명 불일치(stSrch→keyword) 수정함.
+- ✅ 카카오맵 인증 해결: 디버그 패키지명은 `com.yeon.todaymorning.debug`(applicationIdSuffix), 키해시 `+8qgEGP1R4A+UarF0lFXXfTt7hc=` 등록. 401→403→해결 순.
+  - ⚠️ 2024-12부터 카카오맵은 비즈앱+카카오맵 사용설정 ON 필수. 원본앱은 비즈전환됨, [제품설정>카카오맵] 사용설정 ON으로 지도 정상 표시.
+  - 정식 출시 시 원본앱 카카오맵 API 권한 심사(3~5일) 필요. 개발은 테스트앱으로 진행 가능.
+- 🔑 키: BUS_API_KEY, KAKAO_NATIVE_APP_KEY 모두 local.properties에 입력 완료(커밋 금지).
+- 🐞 진단 로깅 추가: TransitRepository catch에 Log.e, NetworkModule OkHttp 로깅 BASIC→**BODY**(출시 전 BASIC 환원 필요).
+- ⏳ **현재 블로커: 버스 API 키 활성화 대기.** data.go.kr 두 서비스(정류소정보조회+버스도착정보조회) 당일(05-30) 신청·승인됐으나 인증서버 미반영 → 앱·포털 미리보기 모두 `SERVICE KEY IS NOT REGISTERED ERROR(코드30)`. 키 전파(수시간~1일) 후 자동 해결 예상. 코드 수정 불필요.
+
+**다음 세션 TODO:**
+- [ ] 버스 키 활성화 확인 (data.go.kr 미리보기에서 정상 데이터 뜨는지) → 앱에서 핀/검색/노선 동작 확인
+- [ ] 실기기 E2E: 지도에서 정류장→노선 선택 → 저장 → 알람 → 타임어택 도착정보 → 탑승완료/자동실패 → 메인 스트릭
+- [ ] 키 활성화 후에도 검색/노선만 안 되면 응답 JSON 필드명 vs StationDtos 대조(파싱 점검)
+- [ ] 출시 전: OkHttp 로깅 BODY→BASIC 환원, 원본앱 카카오맵 권한 심사 신청, 릴리스 키해시 등록
+- [ ] 앱 아이콘 적용: app_icon.png를 Image Asset으로 mipmap 교체(현재 기본 아이콘)
+
+---
+
 ## [2026-05-25] 전체 구현 완료 + 테스트 체크리스트
 
 **상태:** Phase 1~6 코드 구현 완료. 빌드 검증 및 실기기 테스트 대기 중.

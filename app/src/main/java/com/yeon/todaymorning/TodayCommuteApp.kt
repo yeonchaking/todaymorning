@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.kakao.vectormap.KakaoMapSdk
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -12,6 +13,8 @@ class TodayCommuteApp : Application() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        // 카카오맵 SDK 초기화 — 네이티브 앱 키는 local.properties → BuildConfig 주입
+        KakaoMapSdk.init(this, BuildConfig.KAKAO_NATIVE_APP_KEY)
     }
 
     private fun createNotificationChannels() {

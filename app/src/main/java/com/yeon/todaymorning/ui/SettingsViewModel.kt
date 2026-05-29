@@ -28,11 +28,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.saveSettings(settings)
             rescheduleAlarm(settings.alarmHour, settings.alarmMinute)
+            rescheduleMissionFail(settings.targetHour, settings.targetMinute)
         }
     }
 
-    private fun rescheduleAlarm(hour: Int, minute: Int) {
-        val triggerAt = Calendar.getInstance().apply {
+    private fun nextTriggerMillis(hour: Int, minute: Int): Long =
+        Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
@@ -42,6 +43,13 @@ class SettingsViewModel @Inject constructor(
                 add(Calendar.DAY_OF_YEAR, 1)
             }
         }.timeInMillis
-        alarmScheduler.scheduleAt(triggerAt)
+
+    private fun rescheduleAlarm(hour: Int, minute: Int) {
+        alarmScheduler.scheduleAt(nextTriggerMillis(hour, minute))
+    }
+
+    /** 목표 시각에 자동 실패 처리 알람 등록 (탑승 완료를 누르지 않은 경우 대비). */
+    private fun rescheduleMissionFail(hour: Int, minute: Int) {
+        alarmScheduler.scheduleMissionFailAt(nextTriggerMillis(hour, minute))
     }
 }

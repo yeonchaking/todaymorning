@@ -32,6 +32,10 @@ okhttp = "4.12.0"
 # Coroutines
 coroutines = "1.8.1"
 
+# 카카오맵 + 위치
+kakaoMap = "2.12.8" # KakaoMaps SDK v2 (devrepo.kakao.com). 인증 실패 시 2.11.9/2.6.x 등으로 조정
+playServicesLocation = "21.3.0"
+
 # Lottie (버튼 애니메이션 — Phase 5)
 lottie = "6.4.0"
 
@@ -84,6 +88,10 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 
 # ── Coroutines ───────────────────────────────────────
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# ── 카카오맵 + 위치 ──────────────────────────────────
+kakao-map = { group = "com.kakao.maps.open", name = "android", version.ref = "kakaoMap" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 # ── Lottie ───────────────────────────────────────────
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }

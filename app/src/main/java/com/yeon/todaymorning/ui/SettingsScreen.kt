@@ -5,12 +5,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.SavedStateHandle
 import com.yeon.todaymorning.domain.model.TransitType
 import com.yeon.todaymorning.domain.model.UserSettings
 
@@ -18,6 +20,8 @@ import com.yeon.todaymorning.domain.model.UserSettings
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onPickBus: () -> Unit,
+    resultHandle: SavedStateHandle,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val savedSettings by viewModel.settings.collectAsState()
@@ -29,9 +33,25 @@ fun SettingsScreen(
     var targetMinute by remember(savedSettings) { mutableIntStateOf(savedSettings.targetMinute) }
     var transitType by remember(savedSettings) { mutableStateOf(savedSettings.transitType) }
     var busStopId by remember(savedSettings) { mutableStateOf(savedSettings.busStopId) }
+    var busStopName by remember(savedSettings) { mutableStateOf(savedSettings.busStopName) }
     var busRouteId by remember(savedSettings) { mutableStateOf(savedSettings.busRouteId) }
+    var busRouteName by remember(savedSettings) { mutableStateOf(savedSettings.busRouteName) }
+    var busDirection by remember(savedSettings) { mutableStateOf(savedSettings.busDirection) }
     var subwayStationId by remember(savedSettings) { mutableStateOf(savedSettings.subwayStationId) }
     var subwayLineId by remember(savedSettings) { mutableStateOf(savedSettings.subwayLineId) }
+
+    // 지도 화면에서 돌아온 버스 선택 결과 수신
+    val pickedRouteId by resultHandle.getStateFlow("bus_routeId", "").collectAsState()
+    LaunchedEffect(pickedRouteId) {
+        if (pickedRouteId.isNotBlank()) {
+            busStopId = resultHandle["bus_arsId"] ?: ""
+            busStopName = resultHandle["bus_stopName"] ?: ""
+            busRouteId = pickedRouteId
+            busRouteName = resultHandle["bus_routeName"] ?: ""
+            busDirection = resultHandle["bus_direction"] ?: ""
+            resultHandle["bus_routeId"] = "" // 소비
+        }
+    }
 
     var showSavedSnackbar by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -69,27 +89,14 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ── 알람 시각 ──────────────────────────────────
             SettingsSection(title = "알람 시각") {
-                TimePicker(
-                    hour = alarmHour,
-                    minute = alarmMinute,
-                    onHourChange = { alarmHour = it },
-                    onMinuteChange = { alarmMinute = it }
-                )
+                TimePicker(alarmHour, alarmMinute, { alarmHour = it }, { alarmMinute = it })
             }
 
-            // ── 목표 탑승 시각 ─────────────────────────────
             SettingsSection(title = "목표 탑승 시각") {
-                TimePicker(
-                    hour = targetHour,
-                    minute = targetMinute,
-                    onHourChange = { targetHour = it },
-                    onMinuteChange = { targetMinute = it }
-                )
+                TimePicker(targetHour, targetMinute, { targetHour = it }, { targetMinute = it })
             }
 
-            // ── 대중교통 유형 ──────────────────────────────
             SettingsSection(title = "대중교통 유형") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TransitType.entries.forEach { type ->
@@ -110,53 +117,59 @@ fun SettingsScreen(
                 }
             }
 
-            // ── 버스 정보 ──────────────────────────────────
+            // ── 버스 정보 (지도 선택) ──────────────────────
             if (transitType == TransitType.BUS || transitType == TransitType.BOTH) {
-                SettingsSection(title = "버스 정보") {
-                    OutlinedTextField(
-                        value = busStopId,
-                        onValueChange = { busStopId = it },
-                        label = { Text("정류장 ID") },
-                        placeholder = { Text("예: 111000001") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = busRouteId,
-                        onValueChange = { busRouteId = it },
-                        label = { Text("노선 ID") },
-                        placeholder = { Text("예: 100100118") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
+                SettingsSection(title = "출근 버스") {
+                    if (busRouteId.isNotBlank()) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    "${busRouteName}번",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    buildString {
+                                        append(busStopName)
+                                        if (busDirection.isNotBlank()) append("  ·  방면 $busDirection")
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = onPickBus, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Place, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("버스 변경")
+                        }
+                    } else {
+                        Button(onClick = onPickBus, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Place, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("지도에서 버스 선택하기")
+                        }
+                    }
                 }
             }
 
-            // ── 지하철 정보 ────────────────────────────────
+            // ── 지하철 정보 (v1 미구현 안내) ───────────────
             if (transitType == TransitType.SUBWAY || transitType == TransitType.BOTH) {
                 SettingsSection(title = "지하철 정보") {
-                    OutlinedTextField(
-                        value = subwayStationId,
-                        onValueChange = { subwayStationId = it },
-                        label = { Text("역 ID") },
-                        placeholder = { Text("예: 1001000123") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = subwayLineId,
-                        onValueChange = { subwayLineId = it },
-                        label = { Text("호선") },
-                        placeholder = { Text("예: 1호선") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                    Text(
+                        "지하철 선택은 다음 버전에서 지원됩니다. 현재는 버스로 이용해 주세요.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // ── 저장 버튼 ──────────────────────────────────
             Button(
                 onClick = {
                     viewModel.saveSettings(
@@ -167,7 +180,10 @@ fun SettingsScreen(
                             targetMinute = targetMinute,
                             transitType = transitType,
                             busStopId = busStopId,
+                            busStopName = busStopName,
                             busRouteId = busRouteId,
+                            busRouteName = busRouteName,
+                            busDirection = busDirection,
                             subwayStationId = subwayStationId,
                             subwayLineId = subwayLineId
                         )
@@ -220,25 +236,13 @@ private fun TimePicker(
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // 시간
-        TimeSpinner(
-            value = hour,
-            range = 0..23,
-            label = "시",
-            onValueChange = onHourChange
-        )
+        TimeSpinner(value = hour, range = 0..23, label = "시", onValueChange = onHourChange)
         Text(
             text = " : ",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(horizontal = 8.dp)
         )
-        // 분
-        TimeSpinner(
-            value = minute,
-            range = 0..59 step 5,
-            label = "분",
-            onValueChange = onMinuteChange
-        )
+        TimeSpinner(value = minute, range = 0..59 step 5, label = "분", onValueChange = onMinuteChange)
     }
 }
 
@@ -250,11 +254,10 @@ private fun TimeSpinner(
     onValueChange: (Int) -> Unit
 ) {
     val values = range.toList()
-    val current = values.indexOfFirst { it >= value }.takeIf { it >= 0 } ?: 0
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(onClick = {
-            val idx = values.indexOf(value)
+            val idx = values.indexOf(value).takeIf { it >= 0 } ?: 0
             onValueChange(values[(idx + 1) % values.size])
         }) {
             Text("▲", style = MaterialTheme.typography.titleMedium)
@@ -265,7 +268,7 @@ private fun TimeSpinner(
             color = MaterialTheme.colorScheme.onSurface
         )
         IconButton(onClick = {
-            val idx = values.indexOf(value)
+            val idx = values.indexOf(value).takeIf { it >= 0 } ?: 0
             onValueChange(values[(idx - 1 + values.size) % values.size])
         }) {
             Text("▼", style = MaterialTheme.typography.titleMedium)

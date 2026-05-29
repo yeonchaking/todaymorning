@@ -11,6 +11,8 @@ class AlarmScheduler(private val context: Context) {
 
     companion object {
         const val ACTION_ALARM_TRIGGER = "com.yeon.todaymorning.ALARM_TRIGGER"
+        private const val ALARM_REQUEST_CODE = 0
+        private const val MISSION_FAIL_REQUEST_CODE = 100
     }
 
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -18,6 +20,41 @@ class AlarmScheduler(private val context: Context) {
     fun scheduleAfterSeconds(seconds: Int) {
         val triggerAt = System.currentTimeMillis() + seconds * 1000L
         scheduleAt(triggerAt)
+    }
+
+    /**
+     * 목표 시각에 자동 실패 처리 알람 등록.
+     * 이미 지난 시각이면 내일로 보정. 사용자가 그 전에 "탑승 완료"를 누르면
+     * MissionRepository가 성공 기록을 우선하므로 실패가 덮어쓰지 않는다.
+     */
+    fun scheduleMissionFailAt(triggerAtMillis: Long) {
+        if (!canScheduleExactAlarms()) return
+        val intent = Intent(context, MissionFailReceiver::class.java).apply {
+            action = MissionFailReceiver.ACTION_MISSION_FAIL
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            MISSION_FAIL_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent
+        )
+        Log.d("AlarmScheduler", "자동실패 알람 등록: ${java.util.Date(triggerAtMillis)}")
+    }
+
+    fun cancelMissionFail() {
+        val intent = Intent(context, MissionFailReceiver::class.java).apply {
+            action = MissionFailReceiver.ACTION_MISSION_FAIL
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            MISSION_FAIL_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
     }
 
     fun canScheduleExactAlarms(): Boolean {
@@ -38,7 +75,7 @@ class AlarmScheduler(private val context: Context) {
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            0,
+            ALARM_REQUEST_CODE,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -55,7 +92,7 @@ class AlarmScheduler(private val context: Context) {
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            0,
+            ALARM_REQUEST_CODE,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

@@ -6,12 +6,14 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.yeon.todaymorning.ui.busselect.BusSelectScreen
 import com.yeon.todaymorning.ui.result.MissionResultScreen
 import com.yeon.todaymorning.ui.timeattack.TimeAttackScreen
 
 object Routes {
     const val MAIN = "main"
     const val SETTINGS = "settings"
+    const val BUS_SELECT = "bus_select"
     const val TIME_ATTACK = "time_attack"
     const val RESULT = "result/{isSuccess}"
 
@@ -36,9 +38,27 @@ fun NavGraph(
             )
         }
 
-        composable(Routes.SETTINGS) {
+        composable(Routes.SETTINGS) { backStackEntry ->
             SettingsScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onPickBus = { navController.navigate(Routes.BUS_SELECT) },
+                resultHandle = backStackEntry.savedStateHandle
+            )
+        }
+
+        composable(Routes.BUS_SELECT) {
+            BusSelectScreen(
+                onPicked = { result ->
+                    navController.previousBackStackEntry?.savedStateHandle?.apply {
+                        set("bus_arsId", result.arsId)
+                        set("bus_stopName", result.stopName)
+                        set("bus_routeName", result.routeName)
+                        set("bus_direction", result.direction)
+                        set("bus_routeId", result.routeId) // 마지막에 set → 수신 트리거
+                    }
+                    navController.popBackStack()
+                },
+                onBack = { navController.popBackStack() }
             )
         }
 

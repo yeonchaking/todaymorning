@@ -19,7 +19,8 @@ object NetworkModule {
 
     private fun buildOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
+            // 디버그 진단용: 응답 본문까지 출력 (출시 전 BASIC으로 환원)
+            level = HttpLoggingInterceptor.Level.BODY
         })
         .build()
 
