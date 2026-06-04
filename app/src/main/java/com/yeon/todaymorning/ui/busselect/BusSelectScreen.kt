@@ -3,6 +3,8 @@ package com.yeon.todaymorning.ui.busselect
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -70,9 +72,23 @@ fun BusSelectScreen(
         object : KakaoMapReadyCallback() {
             override fun onMapReady(map: KakaoMap) {
                 kakaoMap = map
-                labelStyles = map.labelManager?.addLabelStyles(
-                    LabelStyles.from(LabelStyle.from(R.drawable.ic_bus_marker))
-                )
+                // Kakao Map SDK는 벡터 드로어블을 지원하지 않으므로 비트맵으로 변환
+                val drawable = ContextCompat.getDrawable(context, R.drawable.ic_bus_marker)
+                val markerBitmap: Bitmap? = drawable?.let { d ->
+                    val bmp = Bitmap.createBitmap(
+                        d.intrinsicWidth.coerceAtLeast(1),
+                        d.intrinsicHeight.coerceAtLeast(1),
+                        Bitmap.Config.ARGB_8888
+                    )
+                    d.setBounds(0, 0, bmp.width, bmp.height)
+                    d.draw(Canvas(bmp))
+                    bmp
+                }
+                labelStyles = if (markerBitmap != null) {
+                    map.labelManager?.addLabelStyles(
+                        LabelStyles.from(LabelStyle.from(markerBitmap))
+                    )
+                } else null
                 // 라벨(정류장) 클릭 → 정류장 선택
                 map.setOnLabelClickListener { _, _, label ->
                     val arsId = label.tag as? String

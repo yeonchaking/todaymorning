@@ -61,6 +61,7 @@ class TransitRepository @Inject constructor(
                 }
                 .distinctBy { it.arsId }
                 .sortedBy { it.distance ?: Int.MAX_VALUE }
+                .also { Log.d("TransitRepo", "nearbyBusStops 결과: ${it.size}개 (lat=$lat, lng=$lng)") }
         } catch (e: Exception) {
             Log.e("TransitRepo", "nearbyBusStops 실패 (lat=$lat,lng=$lng): ${e.message}", e)
             emptyList()
