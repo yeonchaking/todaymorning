@@ -1,6 +1,7 @@
 package com.yeon.todaymorning.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -23,17 +24,26 @@ object Routes {
 @Composable
 fun NavGraph(
     navController: NavHostController,
-    fromAlarm: Boolean = false
+    fromAlarm: Boolean = false,
+    onAlarmConsumed: () -> Unit = {}
 ) {
-    val startDestination = if (fromAlarm) Routes.TIME_ATTACK else Routes.MAIN
+    // fromAlarm이 true가 될 때마다 타임어택으로 이동, 소비 후 리셋
+    LaunchedEffect(fromAlarm) {
+        if (fromAlarm) {
+            navController.navigate(Routes.TIME_ATTACK) {
+                popUpTo(Routes.MAIN) { inclusive = false }
+                launchSingleTop = true
+            }
+            onAlarmConsumed()
+        }
+    }
 
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = Routes.MAIN
     ) {
         composable(Routes.MAIN) {
             MainScreen(
-                fromAlarm = false,
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
             )
         }

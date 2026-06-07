@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -59,16 +60,17 @@ class TimeAttackViewModel @Inject constructor(
 
     private fun startCountdown() {
         viewModelScope.launch {
-            while (true) {
-                val s = settings.value
-                val now = System.currentTimeMillis()
-                val target = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, s.targetHour)
-                    set(Calendar.MINUTE, s.targetMinute)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
+            // StateFlow initialValue(기본값)가 아닌 DataStore의 실제 저장값 로드까지 대기
+            val s = dataStore.userSettings.first()
+            val target = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, s.targetHour)
+                set(Calendar.MINUTE, s.targetMinute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 
+            while (true) {
+                val now = System.currentTimeMillis()
                 val remaining = (target - now) / 1000
                 _remainingSeconds.value = remaining
 

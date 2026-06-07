@@ -1,6 +1,7 @@
 package com.yeon.todaymorning.ui
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -11,6 +12,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -46,6 +50,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private lateinit var alarmScheduler: AlarmScheduler  // kept for future use
+    private var fromAlarm by mutableStateOf(false)
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -64,13 +69,30 @@ class MainActivity : ComponentActivity() {
         }
 
         alarmScheduler = AlarmScheduler(this)
-        val fromAlarm = intent.getBooleanExtra(EXTRA_FROM_ALARM, false)
+        fromAlarm = intent.getBooleanExtra(EXTRA_FROM_ALARM, false)
+
+        // Android 14+: USE_FULL_SCREEN_INTENT 권한 별도 허용 필요
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val nm = getSystemService(NotificationManager::class.java)
+            if (!nm.canUseFullScreenIntent()) {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                        Uri.parse("package:$packageName")
+                    )
+                )
+            }
+        }
 
         enableEdgeToEdge()
         setContent {
             TodayCommuteTheme {
                 val navController = rememberNavController()
-                NavGraph(navController = navController, fromAlarm = fromAlarm)
+                NavGraph(
+                    navController = navController,
+                    fromAlarm = fromAlarm,
+                    onAlarmConsumed = { fromAlarm = false }
+                )
             }
         }
     }
@@ -78,13 +100,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // 앱이 이미 실행 중일 때 알람이 오면 STATE 업데이트 → recomposition 트리거
+        if (intent.getBooleanExtra(EXTRA_FROM_ALARM, false)) {
+            fromAlarm = true
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    fromAlarm: Boolean,
     onNavigateToSettings: () -> Unit,
     viewModel: MainViewModel = hiltViewModel()
 ) {
@@ -154,18 +179,11 @@ fun MainScreen(
                 }
             }
 
-            // 알람 시간 + 테스트 버튼
+            // 알람 시간 카드
             item {
                 AlarmCard(
                     alarmHour = settings.alarmHour,
-                    alarmMinute = settings.alarmMinute,
-                    onTestAlarm = {
-                        if (!scheduler.canScheduleExactAlarms()) {
-                            showPermissionBanner = true
-                        } else {
-                            scheduler.scheduleAfterSeconds(5)
-                        }
-                    }
+                    alarmMinute = settings.alarmMinute
                 )
             }
 
@@ -217,8 +235,7 @@ fun MainScreen(
 @Composable
 private fun AlarmCard(
     alarmHour: Int,
-    alarmMinute: Int,
-    onTestAlarm: () -> Unit
+    alarmMinute: Int
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -226,29 +243,22 @@ private fun AlarmCard(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Column {
-                Text(
-                    text = "알람",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                )
-                Text(
-                    text = "%02d:%02d".format(alarmHour, alarmMinute),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            OutlinedButton(onClick = onTestAlarm) {
-                Text("5초 후 테스트")
-            }
+            Text(
+                text = "알람",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            )
+            Text(
+                text = "%02d:%02d".format(alarmHour, alarmMinute),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     }
 }

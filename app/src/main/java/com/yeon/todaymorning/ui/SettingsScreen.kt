@@ -188,7 +188,7 @@ fun SettingsScreen(
                             subwayLineId = subwayLineId
                         )
                     )
-                    showSavedSnackbar = true
+                    onNavigateBack()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,7 +242,7 @@ private fun TimePicker(
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(horizontal = 8.dp)
         )
-        TimeSpinner(value = minute, range = 0..59 step 5, label = "분", onValueChange = onMinuteChange)
+        TimeSpinner(value = minute, range = 0..59 step 1, label = "분", onValueChange = onMinuteChange)
     }
 }
 
