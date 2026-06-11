@@ -5,6 +5,36 @@
 
 ---
 
+## [2026-06-10] 알람 화면 개편 — "끌 때까지 울리는" 진짜 알람 구현
+
+**목표:** 기존엔 알람이 알림음 1회로 끝나고 바로 타임어택으로 넘어감. 사용자가 직접 해제할 때까지 소리·진동이 계속 울리는 알람시계 경험으로 개편.
+
+**결정 사항:**
+- 끄는 방식: **슬라이드 투 디스미스**(끝까지 밀어야 해제). 단순 탭/버튼 실수 방지.
+- **스누즈 없음** — 출근 습관 앱 특성상 의도적으로 제외.
+- 아키텍처: "알림 1발" → **포그라운드 서비스가 알람음을 소유**하는 구조로 전환. 앱이 강제종료돼도 알림이 남아 재진입 가능.
+- 알람음은 시스템 기본 알람음(`RingtoneManager.TYPE_ALARM`) `STREAM_ALARM`/`USAGE_ALARM` 루프 → 무음·진동 모드에서도 알람 볼륨으로 울림. (별도 음원 파일 미사용)
+- 해제 후 흐름: 슬라이드 → 서비스 정지 → `MainActivity`를 `EXTRA_FROM_ALARM=true`로 실행 → 기존 NavGraph 분기로 타임어택 진입(기존 흐름 재사용).
+
+**작업 결과:**
+- 신규 `alarm/AlarmRingService.kt`: 포그라운드 서비스. MediaPlayer 루프 + Vibrator 패턴(1s on/1s off) + 풀스크린 인텐트 알림(`alarm_ring_channel`, 소리는 채널 아닌 서비스가 담당). `start()/stop()` 정적 헬퍼, `ACTION_STOP` 처리.
+- 신규 `ui/AlarmRingActivity.kt`: 잠금화면 위 전체화면(`setShowWhenLocked/turnScreenOn`+keyguard dismiss). Compose 슬라이드 컨트롤(`detectHorizontalDragGestures`, 85% 이상 밀면 해제). 실시간 시계 표시. 뒤로가기로 못 끔. 썸 아이콘은 의존성 리스크 줄이려 텍스트 화살표(→) 사용.
+- `alarm/AlarmReceiver.kt`: 알림 직접 발송 로직 제거 → `AlarmRingService.start(context)` 호출로 단순화. 미사용 import 정리.
+- `AndroidManifest.xml`: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` 권한 추가. `AlarmRingActivity`(showWhenLocked/turnScreenOn/excludeFromRecents/singleTask), `AlarmRingService`(foregroundServiceType=mediaPlayback) 등록.
+
+**검증:**
+- 샌드박스에 Android SDK 없어 실제 Gradle 빌드는 미실행. 참조 무결성·미사용 import·NUL 바이트 정적 점검 통과.
+- ⚠️ 파일 덮어쓰기 과정에서 일부 .kt에 NUL 패딩이 끼는 현상 발견 → 제거 완료. (Android Studio에서 한 번 더 빌드 권장)
+
+**다음 세션 TODO:**
+- [ ] Android Studio 실제 빌드 + 실기기 테스트: 알람 시각에 풀스크린 알람 뜨는지, 소리/진동 반복, 슬라이드 해제 → 타임어택 진입까지 E2E
+- [ ] Android 14+ FGS 시작 제한 확인(`setAlarmClock` 예외로 허용 예상이나 실기기 검증)
+- [ ] 화면 꺼짐/잠금/DND 상태에서 알람 동작 확인, 통화 중·이어폰 케이스 점검
+- [ ] (선택) 설정 화면에 알람음 선택/볼륨 기능 추가
+- [ ] 기존 버스 API 키 활성화·E2E TODO(이전 세션) 잔존
+
+---
+
 ## [2026-05-29] 지도 기반 버스 선택 UX 구현 (카카오맵)
 
 **목표:** 정류장/노선 ID 직접입력 UX를 지도 기반 검색·선택으로 전면 교체 + 핵심 루프 완성
