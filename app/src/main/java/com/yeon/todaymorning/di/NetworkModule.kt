@@ -1,7 +1,9 @@
 package com.yeon.todaymorning.di
 
 import com.yeon.todaymorning.data.api.BusApiService
+import com.yeon.todaymorning.data.api.KakaoLocalApiService
 import com.yeon.todaymorning.data.api.SubwayApiService
+import com.yeon.todaymorning.data.api.TmapApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,36 +21,51 @@ object NetworkModule {
 
     private fun buildOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
-            // 디버그 진단용: 응답 본문까지 출력 (출시 전 BASIC으로 환원)
             level = HttpLoggingInterceptor.Level.BODY
         })
         .build()
 
-    @Provides
-    @Singleton
-    @Named("bus")
+    @Provides @Singleton @Named("bus")
     fun provideBusRetrofit(): Retrofit = Retrofit.Builder()
         .baseUrl("http://ws.bus.go.kr/api/rest/")
         .client(buildOkHttpClient())
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideBusApiService(@Named("bus") retrofit: Retrofit): BusApiService =
         retrofit.create(BusApiService::class.java)
 
-    @Provides
-    @Singleton
-    @Named("subway")
+    @Provides @Singleton @Named("subway")
     fun provideSubwayRetrofit(): Retrofit = Retrofit.Builder()
         .baseUrl("http://swopenapi.seoul.go.kr/api/subway/")
         .client(buildOkHttpClient())
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideSubwayApiService(@Named("subway") retrofit: Retrofit): SubwayApiService =
         retrofit.create(SubwayApiService::class.java)
+
+    @Provides @Singleton @Named("kakaoLocal")
+    fun provideKakaoLocalRetrofit(): Retrofit = Retrofit.Builder()
+        .baseUrl("https://dapi.kakao.com/")
+        .client(buildOkHttpClient())
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    @Provides @Singleton
+    fun provideKakaoLocalApiService(@Named("kakaoLocal") retrofit: Retrofit): KakaoLocalApiService =
+        retrofit.create(KakaoLocalApiService::class.java)
+
+    @Provides @Singleton @Named("tmap")
+    fun provideTmapRetrofit(): Retrofit = Retrofit.Builder()
+        .baseUrl("https://apis.openapi.sk.com/")
+        .client(buildOkHttpClient())
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    @Provides @Singleton
+    fun provideTmapApiService(@Named("tmap") retrofit: Retrofit): TmapApiService =
+        retrofit.create(TmapApiService::class.java)
 }

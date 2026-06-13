@@ -7,14 +7,17 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.yeon.todaymorning.ui.busselect.BusSelectScreen
+import com.yeon.todaymorning.ui.locationpicker.LocationPickerScreen
 import com.yeon.todaymorning.ui.result.MissionResultScreen
+import com.yeon.todaymorning.ui.routeselect.RouteSelectScreen
 import com.yeon.todaymorning.ui.timeattack.TimeAttackScreen
 
 object Routes {
     const val MAIN = "main"
     const val SETTINGS = "settings"
-    const val BUS_SELECT = "bus_select"
+    const val HOME_PICKER = "home_picker"
+    const val WORK_PICKER = "work_picker"
+    const val ROUTE_SELECT = "route_select"
     const val TIME_ATTACK = "time_attack"
     const val RESULT = "result/{isSuccess}"
 
@@ -27,7 +30,6 @@ fun NavGraph(
     fromAlarm: Boolean = false,
     onAlarmConsumed: () -> Unit = {}
 ) {
-    // fromAlarm이 true가 될 때마다 타임어택으로 이동, 소비 후 리셋
     LaunchedEffect(fromAlarm) {
         if (fromAlarm) {
             navController.navigate(Routes.TIME_ATTACK) {
@@ -49,23 +51,115 @@ fun NavGraph(
         }
 
         composable(Routes.SETTINGS) { backStackEntry ->
+            val handle = backStackEntry.savedStateHandle
+
+            // 집 위치 결과 수신
+            val homeLat by handle.getStateFlow("home_lat", 0.0)
+                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
+            val homeLng by handle.getStateFlow("home_lng", 0.0)
+                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
+            val homeAddress by handle.getStateFlow("home_address", "")
+                .let { androidx.compose.runtime.collectAsState(it, "") }
+
+            // 회사 위치 결과 수신
+            val workLat by handle.getStateFlow("work_lat", 0.0)
+                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
+            val workLng by handle.getStateFlow("work_lng", 0.0)
+                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
+            val workAddress by handle.getStateFlow("work_address", "")
+                .let { androidx.compose.runtime.collectAsState(it, "") }
+
+            val settingsViewModel: SettingsViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+
+            // 위치 변경 시 자동 저장
+            LaunchedEffect(homeAddress) {
+                if (homeAddress.isNotBlank()) {
+                    val current = settingsViewModel.settings.value
+                    settingsViewModel.saveSettings(
+                        current.copy(
+                            homeLat = homeLat,
+                            homeLng = homeLng,
+                            homeAddress = homeAddress
+                        )
+                    )
+                    handle["home_address"] = ""
+                }
+            }
+            LaunchedEffect(workAddress) {
+                if (workAddress.isNotBlank()) {
+                    val current = settingsViewModel.settings.value
+                    settingsViewModel.saveSettings(
+                        current.copy(
+                            workLat = workLat,
+                            workLng = workLng,
+                            workAddress = workAddress
+                        )
+                    )
+                    handle["work_address"] = ""
+                }
+            }
+
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onPickBus = { navController.navigate(Routes.BUS_SELECT) },
-                resultHandle = backStackEntry.savedStateHandle
+                onPickHome = { navController.navigate(Routes.HOME_PICKER) },
+                onPickWork = { navController.navigate(Routes.WORK_PICKER) },
+                onFindRoute = { navController.navigate(Routes.ROUTE_SELECT) },
+                viewModel = settingsViewModel
             )
         }
 
-        composable(Routes.BUS_SELECT) {
-            BusSelectScreen(
-                onPicked = { result ->
+        composable(Routes.HOME_PICKER) {
+            val settingsViewModel: SettingsViewModel =
+                androidx.hilt.navigation.compose.hiltViewModel(
+                    navController.getBackStackEntry(Routes.SETTINGS)
+                )
+            val currentSettings = settingsViewModel.settings.value
+
+            LocationPickerScreen(
+                title = "집 위치 설정",
+                initialLat = currentSettings.homeLat,
+                initialLng = currentSettings.homeLng,
+                initialAddress = currentSettings.homeAddress,
+                onConfirm = { result ->
                     navController.previousBackStackEntry?.savedStateHandle?.apply {
-                        set("bus_arsId", result.arsId)
-                        set("bus_stopName", result.stopName)
-                        set("bus_routeName", result.routeName)
-                        set("bus_direction", result.direction)
-                        set("bus_routeId", result.routeId) // 마지막에 set → 수신 트리거
+                        set("home_lat", result.lat)
+                        set("home_lng", result.lng)
+                        set("home_address", result.address)
                     }
+                    navController.popBackStack()
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.WORK_PICKER) {
+            val settingsViewModel: SettingsViewModel =
+                androidx.hilt.navigation.compose.hiltViewModel(
+                    navController.getBackStackEntry(Routes.SETTINGS)
+                )
+            val currentSettings = settingsViewModel.settings.value
+
+            LocationPickerScreen(
+                title = "회사 위치 설정",
+                initialLat = currentSettings.workLat,
+                initialLng = currentSettings.workLng,
+                initialAddress = currentSettings.workAddress,
+                onConfirm = { result ->
+                    navController.previousBackStackEntry?.savedStateHandle?.apply {
+                        set("work_lat", result.lat)
+                        set("work_lng", result.lng)
+                        set("work_address", result.address)
+                    }
+                    navController.popBackStack()
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.ROUTE_SELECT) {
+            RouteSelectScreen(
+                onRouteSelected = {
+                    // 경로 저장 완료 → 설정 화면으로 돌아가기
                     navController.popBackStack()
                 },
                 onBack = { navController.popBackStack() }

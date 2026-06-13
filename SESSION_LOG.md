@@ -5,6 +5,140 @@
 
 ---
 
+## [2026-06-12] 경로 기반 미션 타겟 — 2단계: T-map API + 경로 선택 화면
+
+**목표:** T-map 대중교통 경로 API 연동, RouteSelectScreen 구현, 첫 번째 대중교통 구간 자동 추출 → 미션 타겟 저장
+
+**작업 결과:**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `data/api/dto/TmapRouteDto.kt` | 신규. T-map 경로 요청/응답 DTO 전체 (`TmapRouteRequest`, `TmapRouteResponse` ~ `TmapStation`) |
+| `data/api/TmapApiService.kt` | 신규. `@POST("transit/routes")` — `appKey` 헤더, JSON Body |
+| `di/NetworkModule.kt` | T-map Retrofit 인스턴스 추가 (`apis.openapi.sk.com`, `@Named("tmap")`) |
+| `app/build.gradle.kts` | `TMAP_API_KEY` BuildConfig 필드 추가 |
+| `ui/routeselect/RouteSelectViewModel.kt` | 신규. T-map API 호출 → `RouteOption` 파싱. 버스(arsId 추출)/지하철(역명) 분기. `selectRoute()` → DataStore 저장 |
+| `ui/routeselect/RouteSelectScreen.kt` | 신규. 경로 카드 목록(소요시간·환승·요금·미션타겟 요약). 선택 시 자동 저장 후 설정으로 복귀 |
+| `ui/NavGraph.kt` | `ROUTE_SELECT` 라우트 추가. `onFindRoute` placeholder → 실제 navigate 연결 |
+
+**핵심 로직 — 미션 타겟 추출:**
+- T-map 경로 `legs` 중 첫 번째 비-도보(`mode != "WALK"`) 구간이 미션 대상
+- BUS/EXPRESSBUS: `passStopList.stationList[0].stationID` = arsId (서울버스 API 호환)
+- SUBWAY: `start.name` = 역명 (지하철 API 호환)
+- 도보만 있거나 stationID 없으면 해당 경로 제외
+
+**local.properties 추가 필요:**
+```
+TMAP_API_KEY=발급받은_티맵_API_키
+```
+T-map Developers(https://tmapapi.sktelecom.com) → 앱 키 발급
+
+**빌드/테스트 필요:**
+- Android Studio에서 Gradle sync 후 빌드 확인
+- 설정 화면 → "출근 경로 탐색하기" → RouteSelectScreen → 경로 카드 표시 확인
+- 경로 선택 → 설정 화면으로 복귀 + 미션 타겟 카드 표시 확인
+- 타임어택 화면에서 실제 해당 노선 버스 도착정보 표시 확인
+
+**다음 세션 TODO:**
+- [ ] Android Studio 빌드 + 실기기 E2E 테스트
+- [ ] T-map API 응답 실제 확인 (arsId 매핑 정확도)
+- [ ] 커밋: Phase 1 + Phase 2 변경 파일 전체 (index.lock 해제 후)
+
+---
+
+## [2026-06-11] 타임어택 화면 버그 수정 2건
+
+### 작업 1 — 타임어택 진입 시 버스 정보 즉시 로드 안 되는 버그 수정
+
+**원인:** `TimeAttackViewModel.init`에서 `startPolling()`이 즉시 호출되어 `fetchArrivals()`를 실행하는데, 이 시점에 `settings.value`가 DataStore 로드 전 기본값(`UserSettings()` — 빈 ID)이라 "설정 정보 없음" 분기로 빠짐. 수동 새로고침 시에는 DataStore가 이미 로드돼 있어 정상 동작.
+
+**수정:**
+- `TimeAttackViewModel.startPolling()` — 첫 `fetchArrivals()` 호출 전 `dataStore.userSettings.first()`로 실제 저장값 로드 대기 추가 (기존 `startCountdown()`과 동일한 패턴)
+
+**변경 파일:** `ui/timeattack/TimeAttackViewModel.kt`
+
+---
+
+### 작업 2 — 가로 회전 시 버스 정보 끊김 방지 + 자동 새로고침 10초 + 카운트다운 UI
+
+**원인:** 화면 회전 시 Activity가 재생성되어 ViewModel이 새로 초기화 → 버스 정보 재로드 필요. 사용 시나리오상 가로모드 불필요.
+
+**수정:**
+| 파일 | 변경 내용 |
+|------|-----------|
+| `AndroidManifest.xml` | `MainActivity`에 `android:screenOrientation="portrait"` 추가 — 회전 자체를 차단 |
+| `TimeAttackViewModel.kt` | `_refreshCountdown: MutableStateFlow<Int>(10)` 추가. `startPolling()` 루프를 `delay(30s)` → 10→1 카운트다운(`delay 1s × 10`) 구조로 변경 → 사실상 10초 폴링 |
+| `TimeAttackScreen.kt` | 도착 정보 헤더 영역: 로딩 아닐 때 `새로고침` 버튼 왼쪽에 `n초 뒤` 레이블 표시 |
+
+---
+
+### 작업 3 — 목표 시각 초과 시 자동 실패 제거 + 성공/실패 직접 선택 UI
+
+**원인:** 목표 시각이 지나는 순간 `onMissionFail()` 자동 호출 → 제시간에 탑승했지만 버튼을 바로 못 누른 경우도 실패 처리됨.
+
+**수정:**
+| 파일 | 변경 내용 |
+|------|-----------|
+| `TimeAttackViewModel.kt` | `startCountdown()` — `remaining <= 0` 시 `onMissionFail()` 자동 호출 제거. 미션 상태가 Active인 동안 타이머 계속 진행 |
+| `TimeAttackScreen.kt` | 버튼 분기 추가: `remainingSeconds > 0`이면 기존 "탑승 완료!" 버튼, `<= 0`이면 "미션에 성공하셨나요?" 카드 + ❌ 실패 / ✅ 성공 선택 버튼 |
+| `TimeAttackScreen.kt` | `CountdownCard` — 초과 시 표시 `"⚠️ +timeText 초과"` → `timeText` + 라벨 `"지남"` 으로 변경. 실패 확정 문구도 `"❌ 시간 초과"` → `"❌ 미션 실패"` |
+
+---
+
+### 커밋 대기 중
+
+Android Studio가 `index.lock` 보유 중이라 원격 커밋 불가. 집에 와서 터미널로 직접 실행 권장:
+
+```bash
+git add app/src/main/AndroidManifest.xml \
+        app/src/main/java/com/yeon/todaymorning/ui/timeattack/TimeAttackViewModel.kt \
+        app/src/main/java/com/yeon/todaymorning/ui/timeattack/TimeAttackScreen.kt
+git commit -m "fix: 타임어택 버스 즉시 로드 + 세로 고정 + 10초 자동 새로고침 + 시간초과 직접 선택 UI"
+```
+
+---
+
+## [2026-06-11] 경로 기반 미션 타겟 — 1단계: 위치 설정 + 모델 리팩터
+
+**목표:** 수동 버스/지하철 ID 입력 → 집·회사 위치 설정 + T-map 경로 탐색으로 완전 대체 (1단계: 위치 설정 UI + 모델 교체)
+
+**결정 사항:**
+- 경로 탐색 API: T-map 대중교통 경로 (Phase 2)
+- 집/회사 위치: KakaoMap 중앙 핀 + 주소 검색으로 설정
+- 미션 타겟: T-map 경로 첫 번째 대중교통 구간 자동 추출 (Phase 2)
+- 기존 `TransitType(BUS/SUBWAY/BOTH)` + 수동 ID 입력 → 완전 제거
+
+**작업 결과:**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `domain/model/UserSettings.kt` | `TransitType`, 버스/지하철 ID 필드 제거 → `homeLat/Lng/Address`, `workLat/Lng/Address`, `missionTransitType`, `missionStopId/RouteId/RouteName/StopName/Direction` 추가 |
+| `domain/model/TransitArrival.kt` | `TransitType` enum 이동 (UserSettings에서 분리, ArrivalCard에서 계속 사용) |
+| `data/datastore/UserSettingsDataStore.kt` | DataStore 키 전면 교체. `doublePreferencesKey` 사용 |
+| `data/api/KakaoLocalApiService.kt` | 신규. 역지오코딩(`coord2address`) + 주소 검색(`search/address`) |
+| `data/api/dto/KakaoLocalDto.kt` | 신규. Kakao Local API 응답 DTO |
+| `di/NetworkModule.kt` | Kakao Local API Retrofit 인스턴스 추가 (`dapi.kakao.com`) |
+| `ui/locationpicker/LocationPickerViewModel.kt` | 신규. 카메라 이동 → 역지오코딩, 주소 검색, 결과 선택 |
+| `ui/locationpicker/LocationPickerScreen.kt` | 신규. KakaoMap 중앙 고정 핀 + 주소 검색바 + 내 위치 버튼 + 확정 버튼 |
+| `ui/SettingsScreen.kt` | 버스/지하철 섹션 제거 → 집/회사 위치 카드 + 경로 탐색 버튼 |
+| `ui/NavGraph.kt` | `BUS_SELECT` 제거 → `HOME_PICKER`, `WORK_PICKER` 추가. 위치 결과 SavedStateHandle로 전달 |
+| `ui/timeattack/TimeAttackViewModel.kt` | `fetchArrivals()` — 버스/지하철 분기를 `missionTransitType` 기반으로 변경 |
+| `app/build.gradle.kts` | `KAKAO_REST_API_KEY` BuildConfig 필드 추가 |
+
+**local.properties 추가 필요:**
+```
+KAKAO_REST_API_KEY=발급받은_카카오_REST_API_키
+```
+카카오 개발자 콘솔 → 앱 → 앱 키 → REST API 키
+
+**2단계 TODO (다음 세션):**
+- [ ] T-map API 연동 (`POST https://apis.openapi.sk.com/transit/routes`)
+- [ ] RouteSelectScreen — 경로 옵션 카드 목록 + 선택
+- [ ] 첫 번째 대중교통 구간 자동 추출 → `missionStopId` 등 저장
+- [ ] `local.properties`에 `TMAP_API_KEY` 추가
+
+---
+
 ## [2026-06-10] 알람 화면 개편 — "끌 때까지 울리는" 진짜 알람 구현
 
 **목표:** 기존엔 알람이 알림음 1회로 끝나고 바로 타임어택으로 넘어감. 사용자가 직접 해제할 때까지 소리·진동이 계속 울리는 알람시계 경험으로 개편.

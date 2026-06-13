@@ -36,6 +36,8 @@ android {
         buildConfigField("String", "BUS_API_KEY", "\"${localProps["BUS_API_KEY"] ?: ""}\"")
         buildConfigField("String", "SUBWAY_API_KEY", "\"${localProps["SUBWAY_API_KEY"] ?: ""}\"")
         buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"${localProps["KAKAO_NATIVE_APP_KEY"] ?: ""}\"")
+        buildConfigField("String", "KAKAO_REST_API_KEY", "\"${localProps["KAKAO_REST_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "TMAP_API_KEY", "\"${localProps["TMAP_API_KEY"] ?: ""}\"")
     }
 
     buildTypes {
