@@ -3,9 +3,11 @@ package com.yeon.todaymorning.ui.routeselect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yeon.todaymorning.BuildConfig
+import com.yeon.todaymorning.data.api.BusApiService
 import com.yeon.todaymorning.data.api.TmapApiService
 import com.yeon.todaymorning.data.api.dto.TmapItinerary
 import com.yeon.todaymorning.data.api.dto.TmapRouteRequest
+import com.yeon.todaymorning.data.api.dto.TmapStop
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.UserSettings
@@ -49,6 +51,7 @@ data class RouteSelectUiState(
 @HiltViewModel
 class RouteSelectViewModel @Inject constructor(
     private val tmapApiService: TmapApiService,
+    private val busApiService: BusApiService,
     private val dataStore: UserSettingsDataStore
 ) : ViewModel() {
 
@@ -96,8 +99,10 @@ class RouteSelectViewModel @Inject constructor(
                     return@launch
                 }
 
-                val routeOptions = itineraries.mapIndexedNotNull { idx, it ->
-                    parseItinerary(idx, it)
+                val routeOptions = buildList {
+                    itineraries.forEachIndexed { idx, itin ->
+                        parseItinerary(idx, itin)?.let { add(it) }
+                    }
                 }
 
                 _uiState.value = _uiState.value.copy(
@@ -156,7 +161,7 @@ class RouteSelectViewModel @Inject constructor(
         return SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault()).format(cal.time)
     }
 
-    private fun parseItinerary(index: Int, it: TmapItinerary): RouteOption? {
+    private suspend fun parseItinerary(index: Int, it: TmapItinerary): RouteOption? {
         // 첫 번째 비-도보 구간이 미션 타겟
         val firstTransit = it.legs.firstOrNull { leg ->
             leg.mode != "WALK"
@@ -165,11 +170,12 @@ class RouteSelectViewModel @Inject constructor(
         val (transitType, stopId, routeId, routeName, stopName, direction) =
             when (firstTransit.mode) {
                 "BUS", "EXPRESSBUS", "CITYBUS" -> {
-                    // passStopList 첫 번째 항목 = 탑승 정류장 (stationID = arsId)
-                    val boardStop = firstTransit.passStopList?.stationList?.firstOrNull()
+                    // T-map의 stationID는 서울버스 arsId가 아니므로,
+                    // 탑승 정류장 좌표로 서울버스 API를 조회해 실제 arsId로 변환한다.
+                    val arsId = resolveBusArsId(firstTransit.start) ?: ""
                     TransitTarget(
                         type = MissionTransitType.BUS,
-                        stopId = boardStop?.stationID ?: firstTransit.start?.name ?: "",
+                        stopId = arsId,   // 변환 실패 시 빈 문자열 → 아래에서 해당 경로 제외
                         routeId = firstTransit.routeId,
                         routeName = firstTransit.route,
                         stopName = firstTransit.start?.name ?: "",
@@ -211,6 +217,30 @@ class RouteSelectViewModel @Inject constructor(
             missionStopName = stopName,
             missionDirection = direction
         )
+    }
+
+    /**
+     * T-map 탑승 정류장 좌표 → 서울버스 API arsId 변환.
+     * getStationByPos(좌표 근접 조회)로 가장 가까운 정류장의 arsId를 사용한다.
+     * (T-map stationID는 서울버스 arsId와 호환되지 않음)
+     */
+    private suspend fun resolveBusArsId(stop: TmapStop?): String? {
+        val lon = stop?.lon?.takeIf { it.isNotBlank() } ?: return null
+        val lat = stop.lat.takeIf { it.isNotBlank() } ?: return null
+        return try {
+            val resp = busApiService.getStationByPos(
+                tmX = lon,
+                tmY = lat,
+                radius = "200",
+                serviceKey = BuildConfig.BUS_API_KEY
+            )
+            resp.msgBody?.itemList.orEmpty()
+                .filter { it.arsId.isNotBlank() && it.arsId != "0" }
+                .minByOrNull { it.dist.toIntOrNull() ?: Int.MAX_VALUE }
+                ?.arsId
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private data class TransitTarget(

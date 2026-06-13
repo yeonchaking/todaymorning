@@ -46,9 +46,11 @@ data class TmapFareDetail(
 data class TmapLeg(
     val mode: String = "",        // "WALK" | "BUS" | "SUBWAY" | "EXPRESSBUS"
     val sectionTime: Int = 0,
-    val route: String = "",       // 버스번호 or 호선명
+    val route: String = "",       // 버스번호("간선:402") or 호선명("수도권2호선")
     @SerializedName("routeId")
     val routeId: String = "",
+    val type: Int = 0,            // 노선 종류 코드(버스: 11=간선 등 / 지하철: 호선)
+    val routeColor: String = "",  // 노선 색상 hex
     val start: TmapStop?,
     val end: TmapStop?,
     val passStopList: TmapPassStopList?
@@ -56,18 +58,20 @@ data class TmapLeg(
 
 data class TmapStop(
     val name: String = "",
-    val lon: String = "",
-    val lat: String = ""
+    val lon: String = "",         // 경도(WGS84). 응답에선 숫자지만 Gson이 String으로 흡수
+    val lat: String = ""          // 위도(WGS84)
 )
 
 data class TmapPassStopList(
-    val stationList: List<TmapStation> = emptyList()
+    // ⚠️ 실제 응답 필드명은 "stations" (이전 "stationList" 가정은 오류 → 항상 빈 리스트였음)
+    @SerializedName("stations")
+    val stations: List<TmapStation> = emptyList()
 )
 
 data class TmapStation(
     val index: Int = 0,
     val stationName: String = "",
-    val stationID: String = "",   // 버스 arsId
+    val stationID: String = "",   // ⚠️ T-map 내부 정류장 ID. 서울버스 arsId 아님(좌표로 별도 변환 필요)
     val lon: String = "",
     val lat: String = ""
 )

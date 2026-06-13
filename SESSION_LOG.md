@@ -5,6 +5,50 @@
 
 ---
 
+## [2026-06-13] T-map 경로 응답 검증 + 버스 arsId 변환 보정
+
+**목표:** T-map 대중교통 경로 API 실제 응답과 DTO/추출 로직 대조, 불일치 보정
+
+**결정 사항:**
+- 버스 정류장은 T-map `stationID`를 쓰지 않고, 탑승 정류장 좌표 → 서울버스 `getStationByPos`로 실제 arsId를 변환해 저장 (T-map ID ≠ 서울버스 arsId 확인됨)
+- arsId 변환 실패 시 해당 경로는 목록에서 제외 (쓸 수 없는 미션 타겟 저장 방지)
+
+**작업 결과:**
+- 실제 호출 검증: `apis.openapi.sk.com/transit/routes` HTTP 200, **TMAP_API_KEY 정상**(401 없음, l/I 문제 아님 — 06-13 TODO 해소)
+- 불일치 ① DTO 필드명: `passStopList.stationList` → 실제는 **`stations`** (기존엔 항상 빈 리스트로 파싱됨)
+- 불일치 ② `stationID`(예 772580, 6자리)는 T-map 내부 ID이고 서울버스 arsId(예 22012, 5자리)와 무관 — 06-12 "arsId 매핑 정확도" TODO 검증 결과 **가정이 틀렸음 확인**
+- `TmapRouteDto.kt`: `@SerializedName("stations")` 수정, 주석 보강, `type`/`routeColor` 필드 추가
+- `RouteSelectViewModel.kt`: `BusApiService` 주입, `parseItinerary` suspend화, `resolveBusArsId()` 추가(좌표→arsId, 반경 200m 최근접). 검증 시 14m 거리 정류장이 정확히 일치
+- 빌드 통과 확인 (사용자)
+
+**다음 세션 TODO:**
+- [ ] 실기기 E2E — 경로 선택 시 버스 arsId 정상 채움 + 타임어택 도착정보 표시 확인 (좌표 변환 1회 추가되어 로딩 약간 증가 가능)
+- [ ] 지하철 `start.name` 정규화 — T-map이 "강남"처럼 "역" 없이 줄 수 있어 지하철 도착 API 매칭 확인
+
+---
+
+## [2026-06-13] API 키 세팅 마무리 + 빌드 에러 수정
+
+**목표:** 위치 기반 미션 타겟에 필요한 4개 API 키(TMAP/KAKAO_REST/BUS/SUBWAY)를 BuildConfig까지 연결 완료하고 빌드 통과시키기
+
+**결정 사항:**
+- TMAP은 필요 — 미션 타깃이 "집→정류장/역 도보 시간 역산" 기반이라 도보 경로가 필요한데, 카카오는 도보/대중교통 길찾기 API를 공개 제공하지 않음. 목적지까지 대중교통 최단시간도 쓸 거라 **TMAP + TMAP 대중교통** 두 제품 모두 한 프로젝트에 추가(appKey 공유)
+- 키는 `local.properties`(.gitignore 처리됨)에만 저장, git/메모리에 커밋 안 함
+
+**작업 결과:**
+- `local.properties`: SUBWAY_API_KEY 채움, KAKAO_REST_API_KEY·TMAP_API_KEY 신규 추가 → 4개 키 모두 채워짐
+  - BUS → TransitRepository, SUBWAY → TransitRepository, KAKAO_REST → LocationPickerViewModel(`KakaoAK` 헤더), TMAP → RouteSelectViewModel(`appKey`) 로 정상 소비 확인
+- TMAP 콘솔: "오늘도출근" 앱 활성화, appKey 발급 완료 (TMAP Free + TMAP 대중교통 Free)
+- `ui/NavGraph.kt` 컴파일 에러 수정: `collectAsState`를 일반 함수처럼 호출하던 것을 StateFlow 확장 함수 호출로 변경, `getStateFlow`가 초기값을 포함하므로 중복 default 인자 제거, `collectAsState`·`getValue` import 추가 → `compileDebugKotlin` 통과
+- 커밋: `fix: NavGraph의 collectAsState 확장 함수 호출 오류 수정` (2d33435)
+
+**다음 세션 TODO:**
+- [ ] **Git 리모트 연결** — 현재 이 저장소에 리모트가 0개라 SourceTree 푸시가 무한 로딩됨. GitHub에 빈 repo 생성 후 `git remote add origin <URL>` + `git push -u origin main` 필요
+- [ ] TMAP_API_KEY의 `l/I` 글자 — 콘솔 복사값이라 정상이라 했으나, 인증오류(401) 나면 재대조
+- [ ] RouteSelectScreen 실제 동작 확인(경로 카드 표시 → 선택 → 미션 타겟 저장 → 타임어택 도착정보)
+
+---
+
 ## [2026-06-12] 경로 기반 미션 타겟 — 2단계: T-map API + 경로 선택 화면
 
 **목표:** T-map 대중교통 경로 API 연동, RouteSelectScreen 구현, 첫 번째 대중교통 구간 자동 추출 → 미션 타겟 저장
