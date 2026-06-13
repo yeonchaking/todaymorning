@@ -29,14 +29,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
 import com.yeon.todaymorning.alarm.AlarmScheduler
 import com.yeon.todaymorning.data.db.MissionRecord
+import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.UserLevel
+import com.yeon.todaymorning.domain.model.UserSettings
 import com.yeon.todaymorning.ui.main.MainViewModel
 import com.yeon.todaymorning.ui.theme.TodayCommuteTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -179,12 +185,9 @@ fun MainScreen(
                 }
             }
 
-            // 알람 시간 카드
+            // 오늘의 미션 카드
             item {
-                AlarmCard(
-                    alarmHour = settings.alarmHour,
-                    alarmMinute = settings.alarmMinute
-                )
+                MissionCard(settings = settings)
             }
 
             // 통계 카드 (레벨 / streak / 성공률)
@@ -233,10 +236,35 @@ fun MainScreen(
 }
 
 @Composable
-private fun AlarmCard(
-    alarmHour: Int,
-    alarmMinute: Int
-) {
+private fun MissionCard(settings: UserSettings) {
+    val alarmText = "%02d:%02d".format(settings.alarmHour, settings.alarmMinute)
+    val targetText = "%02d:%02d".format(settings.targetHour, settings.targetMinute)
+
+    val transitEmoji = when (settings.missionTransitType) {
+        MissionTransitType.BUS -> "🚌"
+        MissionTransitType.SUBWAY -> "🚇"
+        else -> "🚉"
+    }
+    val transitWord = when (settings.missionTransitType) {
+        MissionTransitType.BUS -> "버스"
+        MissionTransitType.SUBWAY -> "지하철"
+        else -> "대중교통"
+    }
+
+    // 1줄: "강남 에서" (에서 작게) / 2줄: "🚌 651, 388 버스 타기!!"
+    val boardingText = buildAnnotatedString {
+        if (settings.hasMissionTarget) {
+            append(settings.missionStopName)
+            withStyle(SpanStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)) {
+                append(" 에서")
+            }
+            append("\n")
+            append("$transitEmoji ${settings.missionRoutesLabel} $transitWord 타기!!")
+        } else {
+            append("$transitEmoji 대중교통 타기!!")
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -246,17 +274,56 @@ private fun AlarmCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "알람",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-            )
-            Text(
-                text = "%02d:%02d".format(alarmHour, alarmMinute),
-                style = MaterialTheme.typography.displaySmall,
+                text = "🎯 오늘의 미션",
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+            )
+
+            // n시에 기상해서
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = alarmText,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "에 기상해서",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
+
+            // m시까지
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = targetText,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "까지",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
+
+            // ○○ 에서 / 노선 타기!!
+            Text(
+                text = boardingText,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 30.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }

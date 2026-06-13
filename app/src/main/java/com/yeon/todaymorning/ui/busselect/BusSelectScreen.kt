@@ -73,10 +73,10 @@ fun BusSelectScreen(
             override fun onMapReady(map: KakaoMap) {
                 kakaoMap = map
                 // Kakao Map SDK는 벡터 드로어블을 지원하지 않으므로 비트맵으로 변환
-                // dp→px 명시 변환 (핀: 32×44dp)
+                // dp→px 명시 변환 (핀: 14×22dp — 기존 32×44의 절반 + 가로 추가 축소)
                 val density = context.resources.displayMetrics.density
-                val markerW = (32 * density).toInt()
-                val markerH = (44 * density).toInt()
+                val markerW = (14 * density).toInt()
+                val markerH = (22 * density).toInt()
                 val drawable = ContextCompat.getDrawable(context, R.drawable.ic_bus_marker)
                 val markerBitmap: Bitmap? = drawable?.let { d ->
                     val bmp = Bitmap.createBitmap(markerW, markerH, Bitmap.Config.ARGB_8888)

@@ -5,6 +5,29 @@
 
 ---
 
+## [2026-06-13] 설정/메인 UI 시나리오 개선 + 입력 검증 + 핀 크기 조정
+
+**목표:** 간단한 UI 시나리오 변경 — 시각 입력 방식 개선, 메인 화면 미션 형식 표시, 입력 검증, 지도 핀 축소
+
+**결정 사항:**
+- 시각 입력: ▲▼ 스피너 → **탭 시 Material3 시계(TimePicker) 다이얼로그**(24시간제). `material-icons-extended` 미의존이라 시계 아이콘은 `⏰` 이모지로 대체
+- 메인 화면: 단순 "알람 07:00" 카드 → **"🎯 오늘의 미션 / n시에 기상해서 / m시까지 / ○○에서 노선 타기!!"** 미션 형식
+- 미션 카드 정류장 줄: "에서"만 작은 폰트(15sp) + 줄바꿈 → 노선·교통수단은 큰 글씨(타기!!)
+- 알람 시각 ≥ 목표 탑승 시각이면 저장 차단(스낵바 안내)
+- 지도 출근버스 핀: 32×44dp → **14×22dp**(절반 + 가로 추가 축소)
+
+**작업 결과:**
+- `ui/SettingsScreen.kt`: `TimeSpinner/TimePicker(old)` 제거 → `TimeDisplayCard`(Surface onClick) + `TimePickerDialog`(AlertDialog + M3 TimePicker, `rememberTimePickerState`). 저장 시 `alarmTotal >= targetTotal` 검증 + `showTimeError` 스낵바 추가
+- `ui/MainActivity.kt`: `AlarmCard` → `MissionCard(settings)`. `buildAnnotatedString`로 "에서" SpanStyle 축소 + 줄바꿈, `MissionTransitType`/`UserSettings` import 추가, 미션 미설정 시 "🚉 대중교통 타기!!" 폴백
+- `ui/busselect/BusSelectScreen.kt`: 마커 비트맵 `markerW/H` 14×22dp로 축소
+
+**다음 세션 TODO:**
+- [ ] 지하철 역·방향 직접 선택 화면 신규 추가 (모델·타임어택은 SUBWAY 다수노선 이미 대응)
+- [ ] 예외처리 전체 정리: HttpException 코드별 공통 매핑 유틸, 카카오/버스/지하철 메시지 표준화, 재시도·백오프, '동' 단위 지역검색 결과 필터링 검토
+- [ ] (정식 배포) T-map/카카오 API 키 백엔드 프록시화 + 한도 제어, 또는 ODsay(무료 1,000/일) 검토
+
+---
+
 ## [2026-06-13] 위치 선택 버그 수정 + API 한도 대응 → 미션 대상 직접선택 전환
 
 **목표:** 지도 확대 시 줌 리셋 버그 수정 → API 한도(429/일10) 진단 → 경로탐색 시나리오 재설계

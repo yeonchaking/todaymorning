@@ -33,8 +33,19 @@ fun SettingsScreen(
     var targetHour by remember(savedSettings) { mutableIntStateOf(savedSettings.targetHour) }
     var targetMinute by remember(savedSettings) { mutableIntStateOf(savedSettings.targetMinute) }
 
+    var showAlarmPicker by remember { mutableStateOf(false) }
+    var showTargetPicker by remember { mutableStateOf(false) }
+
     var showSavedSnackbar by remember { mutableStateOf(false) }
+    var showTimeError by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(showTimeError) {
+        if (showTimeError) {
+            snackbarHostState.showSnackbar("알람 시각은 목표 탑승 시각보다 빨라야 해요")
+            showTimeError = false
+        }
+    }
 
     LaunchedEffect(showSavedSnackbar) {
         if (showSavedSnackbar) {
@@ -71,12 +82,20 @@ fun SettingsScreen(
         ) {
             // ── 알람 시각 ──────────────────────────────────────
             SettingsSection(title = "알람 시각") {
-                TimePicker(alarmHour, alarmMinute, { alarmHour = it }, { alarmMinute = it })
+                TimeDisplayCard(
+                    hour = alarmHour,
+                    minute = alarmMinute,
+                    onClick = { showAlarmPicker = true }
+                )
             }
 
             // ── 목표 탑승 시각 ─────────────────────────────────
             SettingsSection(title = "목표 탑승 시각") {
-                TimePicker(targetHour, targetMinute, { targetHour = it }, { targetMinute = it })
+                TimeDisplayCard(
+                    hour = targetHour,
+                    minute = targetMinute,
+                    onClick = { showTargetPicker = true }
+                )
             }
 
             // ── 집/회사 위치 (경로탐색 보류로 당장 불필요 — 추후 복구) ──────
@@ -159,6 +178,12 @@ fun SettingsScreen(
             // ── 저장 ───────────────────────────────────────────
             Button(
                 onClick = {
+                    val alarmTotal = alarmHour * 60 + alarmMinute
+                    val targetTotal = targetHour * 60 + targetMinute
+                    if (alarmTotal >= targetTotal) {
+                        showTimeError = true
+                        return@Button
+                    }
                     viewModel.saveSettings(
                         savedSettings.copy(
                             alarmHour = alarmHour,
@@ -178,6 +203,34 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (showAlarmPicker) {
+        TimePickerDialog(
+            title = "알람 시각 선택",
+            initialHour = alarmHour,
+            initialMinute = alarmMinute,
+            onConfirm = { h, m ->
+                alarmHour = h
+                alarmMinute = m
+                showAlarmPicker = false
+            },
+            onDismiss = { showAlarmPicker = false }
+        )
+    }
+
+    if (showTargetPicker) {
+        TimePickerDialog(
+            title = "목표 탑승 시각 선택",
+            initialHour = targetHour,
+            initialMinute = targetMinute,
+            onConfirm = { h, m ->
+                targetHour = h
+                targetMinute = m
+                showTargetPicker = false
+            },
+            onDismiss = { showTargetPicker = false }
+        )
     }
 }
 
@@ -239,59 +292,74 @@ private fun SettingsSection(
     }
 }
 
+/** 탭하면 시계 다이얼로그를 여는 시각 표시 카드 */
 @Composable
-private fun TimePicker(
+private fun TimeDisplayCard(
     hour: Int,
     minute: Int,
-    onHourChange: (Int) -> Unit,
-    onMinuteChange: (Int) -> Unit
+    onClick: () -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth()
     ) {
-        TimeSpinner(value = hour, range = 0..23, label = "시", onValueChange = onHourChange)
-        Text(
-            text = " : ",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
-        TimeSpinner(value = minute, range = 0..59 step 1, label = "분", onValueChange = onMinuteChange)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp, horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(text = "⏰", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = "%02d : %02d".format(hour, minute),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 
+/** Material3 시계 TimePicker 다이얼로그 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TimeSpinner(
-    value: Int,
-    range: IntProgression,
-    label: String,
-    onValueChange: (Int) -> Unit
+private fun TimePickerDialog(
+    title: String,
+    initialHour: Int,
+    initialMinute: Int,
+    onConfirm: (Int, Int) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    val values = range.toList()
+    val state = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = true
+    )
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        IconButton(onClick = {
-            val idx = values.indexOf(value).takeIf { it >= 0 } ?: 0
-            onValueChange(values[(idx + 1) % values.size])
-        }) {
-            Text("▲", style = MaterialTheme.typography.titleMedium)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                TimePicker(state = state)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
+                Text("확인")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소")
+            }
         }
-        Text(
-            text = "%02d".format(value),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        IconButton(onClick = {
-            val idx = values.indexOf(value).takeIf { it >= 0 } ?: 0
-            onValueChange(values[(idx - 1 + values.size) % values.size])
-        }) {
-            Text("▼", style = MaterialTheme.typography.titleMedium)
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+    )
 }
