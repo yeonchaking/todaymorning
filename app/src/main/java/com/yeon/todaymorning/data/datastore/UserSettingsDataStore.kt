@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.yeon.todaymorning.domain.model.MissionRoute
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +19,9 @@ import kotlinx.coroutines.flow.map
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_settings")
 
 class UserSettingsDataStore(private val context: Context) {
+
+    private val gson = Gson()
+    private val missionRoutesType = object : TypeToken<List<MissionRoute>>() {}.type
 
     companion object {
         val ALARM_HOUR = intPreferencesKey("alarm_hour")
@@ -33,10 +39,8 @@ class UserSettingsDataStore(private val context: Context) {
 
         val MISSION_TRANSIT_TYPE = stringPreferencesKey("mission_transit_type")
         val MISSION_STOP_ID = stringPreferencesKey("mission_stop_id")
-        val MISSION_ROUTE_ID = stringPreferencesKey("mission_route_id")
-        val MISSION_ROUTE_NAME = stringPreferencesKey("mission_route_name")
         val MISSION_STOP_NAME = stringPreferencesKey("mission_stop_name")
-        val MISSION_DIRECTION = stringPreferencesKey("mission_direction")
+        val MISSION_ROUTES = stringPreferencesKey("mission_routes")  // JSON List<MissionRoute>
     }
 
     val userSettings: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -55,10 +59,10 @@ class UserSettingsDataStore(private val context: Context) {
                 prefs[MISSION_TRANSIT_TYPE] ?: MissionTransitType.NONE.name
             ),
             missionStopId = prefs[MISSION_STOP_ID] ?: "",
-            missionRouteId = prefs[MISSION_ROUTE_ID] ?: "",
-            missionRouteName = prefs[MISSION_ROUTE_NAME] ?: "",
             missionStopName = prefs[MISSION_STOP_NAME] ?: "",
-            missionDirection = prefs[MISSION_DIRECTION] ?: ""
+            missionRoutes = prefs[MISSION_ROUTES]?.takeIf { it.isNotBlank() }?.let {
+                runCatching { gson.fromJson<List<MissionRoute>>(it, missionRoutesType) }.getOrNull()
+            } ?: emptyList()
         )
     }
 
@@ -76,10 +80,8 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[WORK_ADDRESS] = settings.workAddress
             prefs[MISSION_TRANSIT_TYPE] = settings.missionTransitType.name
             prefs[MISSION_STOP_ID] = settings.missionStopId
-            prefs[MISSION_ROUTE_ID] = settings.missionRouteId
-            prefs[MISSION_ROUTE_NAME] = settings.missionRouteName
             prefs[MISSION_STOP_NAME] = settings.missionStopName
-            prefs[MISSION_DIRECTION] = settings.missionDirection
+            prefs[MISSION_ROUTES] = gson.toJson(settings.missionRoutes)
         }
     }
 }

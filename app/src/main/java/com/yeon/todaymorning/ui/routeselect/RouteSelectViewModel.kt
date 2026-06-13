@@ -9,14 +9,19 @@ import com.yeon.todaymorning.data.api.dto.TmapItinerary
 import com.yeon.todaymorning.data.api.dto.TmapRouteRequest
 import com.yeon.todaymorning.data.api.dto.TmapStop
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
+import com.yeon.todaymorning.domain.model.MissionRoute
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.UserSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -58,6 +63,10 @@ class RouteSelectViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RouteSelectUiState())
     val uiState: StateFlow<RouteSelectUiState> = _uiState.asStateFlow()
 
+    // 일회성 토스트 메시지
+    private val _toastEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val toastEvent: SharedFlow<String> = _toastEvent.asSharedFlow()
+
     init {
         fetchRoutes()
     }
@@ -92,10 +101,9 @@ class RouteSelectViewModel @Inject constructor(
 
                 val itineraries = response.metaData?.plan?.itineraries ?: emptyList()
                 if (itineraries.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = "경로를 찾을 수 없습니다."
-                    )
+                    val msg = "경로를 찾을 수 없어요.\n출발지·목적지를 더 정확히 입력해주세요."
+                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = msg)
+                    _toastEvent.tryEmit(msg)
                     return@launch
                 }
 
@@ -110,10 +118,16 @@ class RouteSelectViewModel @Inject constructor(
                     routes = routeOptions
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = "경로 탐색 실패: ${e.message}"
-                )
+                val msg = when {
+                    e is HttpException && e.code() == 429 ->
+                        "요청이 많아 잠시 제한됐어요. 잠시 후 다시 시도해주세요."
+                    e is HttpException ->
+                        "경로 탐색 실패 (HTTP ${e.code()})"
+                    else ->
+                        "경로 탐색 실패: ${e.message}"
+                }
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = msg)
+                _toastEvent.tryEmit(msg)
             }
         }
     }
@@ -127,10 +141,14 @@ class RouteSelectViewModel @Inject constructor(
                     current.copy(
                         missionTransitType = route.missionTransitType,
                         missionStopId = route.missionStopId,
-                        missionRouteId = route.missionRouteId,
-                        missionRouteName = route.missionRouteName,
                         missionStopName = route.missionStopName,
-                        missionDirection = route.missionDirection
+                        missionRoutes = listOf(
+                            MissionRoute(
+                                routeId = route.missionRouteId,
+                                routeName = route.missionRouteName,
+                                direction = route.missionDirection
+                            )
+                        )
                     )
                 )
                 _uiState.value = _uiState.value.copy(

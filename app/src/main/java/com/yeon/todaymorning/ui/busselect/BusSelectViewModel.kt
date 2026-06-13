@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.yeon.todaymorning.data.repository.TransitRepository
 import com.yeon.todaymorning.domain.model.BusRouteOption
 import com.yeon.todaymorning.domain.model.BusStop
+import com.yeon.todaymorning.domain.model.MissionRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,19 +24,19 @@ data class BusSelectUiState(
     val isSearchMode: Boolean = false,
     val selectedStop: BusStop? = null,
     val routesAtStop: List<BusRouteOption> = emptyList(),
+    /** 다수 선택된 노선 ID(busRouteId) 집합. */
+    val selectedRouteIds: Set<String> = emptySet(),
     val isLoadingStops: Boolean = false,
     val isLoadingRoutes: Boolean = false,
     /** 지도가 이동해야 할 목표 좌표(검색/내주변 결과). null이면 이동 안 함. */
     val moveCameraTo: BusStop? = null
 )
 
-/** 선택 완료 결과. */
+/** 선택 완료 결과 — 한 정류장 + 다수 노선. */
 data class BusSelectResult(
     val arsId: String,
     val stopName: String,
-    val routeId: String,
-    val routeName: String,
-    val direction: String
+    val routes: List<MissionRoute>
 )
 
 @HiltViewModel
@@ -91,25 +92,41 @@ class BusSelectViewModel @Inject constructor(
     }
 
     fun selectStop(stop: BusStop) {
-        _uiState.update { it.copy(selectedStop = stop, isLoadingRoutes = true, routesAtStop = emptyList()) }
+        _uiState.update {
+            it.copy(
+                selectedStop = stop,
+                isLoadingRoutes = true,
+                routesAtStop = emptyList(),
+                selectedRouteIds = emptySet()   // 새 정류장 선택 시 노선 선택 초기화
+            )
+        }
         viewModelScope.launch {
             val routes = repository.getRoutesAtStop(stop.arsId)
             _uiState.update { it.copy(routesAtStop = routes, isLoadingRoutes = false) }
         }
     }
 
-    fun clearSelection() {
-        _uiState.update { it.copy(selectedStop = null, routesAtStop = emptyList()) }
+    /** 노선 다수 선택 토글. */
+    fun toggleRoute(route: BusRouteOption) {
+        _uiState.update {
+            val ids = it.selectedRouteIds.toMutableSet()
+            if (!ids.add(route.busRouteId)) ids.remove(route.busRouteId)
+            it.copy(selectedRouteIds = ids)
+        }
     }
 
-    fun buildResult(route: BusRouteOption): BusSelectResult? {
-        val stop = _uiState.value.selectedStop ?: return null
-        return BusSelectResult(
-            arsId = stop.arsId,
-            stopName = stop.name,
-            routeId = route.busRouteId,
-            routeName = route.routeName,
-            direction = route.direction
-        )
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedStop = null, routesAtStop = emptyList(), selectedRouteIds = emptySet()) }
+    }
+
+    /** 선택된 노선들로 결과 생성. 선택이 없으면 null. */
+    fun buildResult(): BusSelectResult? {
+        val s = _uiState.value
+        val stop = s.selectedStop ?: return null
+        val routes = s.routesAtStop
+            .filter { it.busRouteId in s.selectedRouteIds }
+            .map { MissionRoute(routeId = it.busRouteId, routeName = it.routeName, direction = it.direction) }
+        if (routes.isEmpty()) return null
+        return BusSelectResult(arsId = stop.arsId, stopName = stop.name, routes = routes)
     }
 }

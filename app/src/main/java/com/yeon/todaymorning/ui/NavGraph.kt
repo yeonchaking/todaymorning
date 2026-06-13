@@ -9,6 +9,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.yeon.todaymorning.domain.model.MissionTransitType
+import com.yeon.todaymorning.ui.busselect.BusSelectScreen
 import com.yeon.todaymorning.ui.locationpicker.LocationPickerScreen
 import com.yeon.todaymorning.ui.result.MissionResultScreen
 import com.yeon.todaymorning.ui.routeselect.RouteSelectScreen
@@ -19,7 +21,8 @@ object Routes {
     const val SETTINGS = "settings"
     const val HOME_PICKER = "home_picker"
     const val WORK_PICKER = "work_picker"
-    const val ROUTE_SELECT = "route_select"
+    const val ROUTE_SELECT = "route_select"   // T-map 경로탐색 (보류, 추후 사용)
+    const val BUS_SELECT = "bus_select"
     const val TIME_ATTACK = "time_attack"
     const val RESULT = "result/{isSuccess}"
 
@@ -99,7 +102,7 @@ fun NavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 onPickHome = { navController.navigate(Routes.HOME_PICKER) },
                 onPickWork = { navController.navigate(Routes.WORK_PICKER) },
-                onFindRoute = { navController.navigate(Routes.ROUTE_SELECT) },
+                onFindRoute = { navController.navigate(Routes.BUS_SELECT) },
                 viewModel = settingsViewModel
             )
         }
@@ -152,12 +155,33 @@ fun NavGraph(
             )
         }
 
-        composable(Routes.ROUTE_SELECT) {
-            RouteSelectScreen(
-                onRouteSelected = {
-                    // 경로 저장 완료 → 설정 화면으로 돌아가기
+        // 첫 대중교통(정류장 + 다수 노선) 직접 선택
+        composable(Routes.BUS_SELECT) {
+            val settingsViewModel: SettingsViewModel =
+                androidx.hilt.navigation.compose.hiltViewModel(
+                    navController.getBackStackEntry(Routes.SETTINGS)
+                )
+            BusSelectScreen(
+                onPicked = { result ->
+                    val current = settingsViewModel.settings.value
+                    settingsViewModel.saveSettings(
+                        current.copy(
+                            missionTransitType = MissionTransitType.BUS,
+                            missionStopId = result.arsId,
+                            missionStopName = result.stopName,
+                            missionRoutes = result.routes
+                        )
+                    )
                     navController.popBackStack()
                 },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // T-map 자동 경로탐색 (보류 — 추후 유료 플랜 시 재연결)
+        composable(Routes.ROUTE_SELECT) {
+            RouteSelectScreen(
+                onRouteSelected = { navController.popBackStack() },
                 onBack = { navController.popBackStack() }
             )
         }

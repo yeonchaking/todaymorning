@@ -261,8 +261,15 @@ fun BusSelectScreen(
                         )
                     }
                     else -> {
-                        LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        Text(
+                            "타는 노선을 모두 선택하세요 (여러 개 가능)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
                             items(state.routesAtStop, key = { it.busRouteId }) { route ->
+                                val checked = route.busRouteId in state.selectedRouteIds
                                 ListItem(
                                     headlineContent = { Text("${route.routeName}번") },
                                     supportingContent = {
@@ -276,12 +283,27 @@ fun BusSelectScreen(
                                             }
                                         )
                                     },
-                                    modifier = Modifier.clickable {
-                                        viewModel.buildResult(route)?.let(onPicked)
-                                    }
+                                    leadingContent = {
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = { viewModel.toggleRoute(route) }
+                                        )
+                                    },
+                                    modifier = Modifier.clickable { viewModel.toggleRoute(route) }
                                 )
                                 HorizontalDivider()
                             }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = { viewModel.buildResult()?.let(onPicked) },
+                            enabled = state.selectedRouteIds.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (state.selectedRouteIds.isEmpty()) "노선을 선택하세요"
+                                else "선택 완료 (${state.selectedRouteIds.size})"
+                            )
                         }
                     }
                 }

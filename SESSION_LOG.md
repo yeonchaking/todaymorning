@@ -5,6 +5,32 @@
 
 ---
 
+## [2026-06-13] 위치 선택 버그 수정 + API 한도 대응 → 미션 대상 직접선택 전환
+
+**목표:** 지도 확대 시 줌 리셋 버그 수정 → API 한도(429/일10) 진단 → 경로탐색 시나리오 재설계
+
+**결정 사항:**
+- LocationPicker: 카메라 피드백 루프 제거. 지도 드래그 추측 대신 **주소 입력 Dialog → 검색결과 선택 → 핀 확인** 방식으로 전환 (역지오코딩 0회). 진입 시 빈 Dialog 자동 표시
+- API 한도 진단: 카카오 `coord2address`는 일일 쿼터 소진(-10), T-map `transit/routes`는 **무료 트라이얼 일/10 공유 한도**(429=Too Many Requests). 정식 서비스 불가 확인
+- **미션 대상 설정 시나리오 전환**(메모리 mission-target-pivot): T-map 경로탐색 보류 → 지도에서 첫 정류장 직접 선택 + **다수 노선 선택**(아무거나 타면 성공). 버스 먼저, 지하철 곧바로
+- 집/회사 위치는 당장 불필요 → 설정 화면에서 주석처리(추후 경로탐색 복구 시 되살림)
+
+**작업 결과:**
+- `LocationPickerScreen/ViewModel`: `cameraMoveEvent`(SharedFlow)로 프로그램 이동만 반영, 사용자 줌/드래그는 카메라 비간섭. 주소검색 Dialog + "여기가 맞나요?" 확인카드 + 재입력(펜)
+- `RouteSelectViewModel/Screen`: 에러 분류 토스트 추가 (429→"잠시 후", 경로없음→"출발지·목적지 정확히", 기타→코드표시)
+- 데이터 모델: `MissionRoute` 추가, `UserSettings.missionRoutes: List<MissionRoute>`로 단일→리스트 전환, DataStore Gson 직렬화
+- `BusSelectViewModel/Screen`: 노선 체크박스 다수선택 + "선택 완료(N)". `BusSelectResult`는 정류장+노선리스트
+- `NavGraph`: 설정 "출근 버스 선택하기" → `BUS_SELECT` 연결, 결과 저장. `ROUTE_SELECT`(T-map)는 연결 해제·코드 보관
+- `TimeAttackViewModel`: 선택 노선 전부 도착정보 합산 조회
+- `SettingsScreen`: 미션요약을 다수노선(`missionRoutesLabel`)+정류장으로 표시, 집/회사 섹션 주석처리
+
+**다음 세션 TODO:**
+- [ ] 지하철 역·방향 직접 선택 화면 신규 추가 (모델·타임어택은 SUBWAY 다수노선 이미 대응)
+- [ ] 예외처리 전체 정리: HttpException 코드별 공통 매핑 유틸, 카카오/버스/지하철 메시지 표준화, 재시도·백오프, '동' 단위 지역검색 결과 필터링 검토
+- [ ] (정식 배포) T-map/카카오 API 키 백엔드 프록시화 + 한도 제어, 또는 ODsay(무료 1,000/일) 검토
+
+---
+
 ## [2026-06-13] 지하철 역명 정규화 + 세션로그 TODO 정리
 
 **목표:** 남은 TODO 마무리 — 지하철 `start.name` 정규화

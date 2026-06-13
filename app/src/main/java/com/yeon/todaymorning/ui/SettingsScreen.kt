@@ -79,6 +79,8 @@ fun SettingsScreen(
                 TimePicker(targetHour, targetMinute, { targetHour = it }, { targetMinute = it })
             }
 
+            // ── 집/회사 위치 (경로탐색 보류로 당장 불필요 — 추후 복구) ──────
+            /*
             // ── 집 위치 ────────────────────────────────────────
             SettingsSection(title = "집 위치") {
                 LocationCard(
@@ -98,8 +100,9 @@ fun SettingsScreen(
                     onEdit = onPickWork
                 )
             }
+            */
 
-            // ── 경로 탐색 + 미션 타겟 ─────────────────────────
+            // ── 출근 버스 선택 + 미션 타겟 ─────────────────────────
             SettingsSection(title = "출근 경로") {
                 if (savedSettings.hasMissionTarget) {
                     // 미션 타겟 요약 카드
@@ -120,17 +123,13 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = savedSettings.missionRouteName,
+                                text = savedSettings.missionRoutesLabel,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = buildString {
-                                    append(savedSettings.missionStopName)
-                                    if (savedSettings.missionDirection.isNotBlank())
-                                        append("  ·  방면 ${savedSettings.missionDirection}")
-                                },
+                                text = savedSettings.missionStopName,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -139,30 +138,20 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = onFindRoute,
-                        enabled = savedSettings.hasHomeLocation && savedSettings.hasWorkLocation,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Place, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("경로 다시 탐색")
+                        Text("출근 버스 다시 선택")
                     }
                 } else {
                     Button(
                         onClick = onFindRoute,
-                        enabled = savedSettings.hasHomeLocation && savedSettings.hasWorkLocation,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Place, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("출근 경로 탐색하기")
-                    }
-                    if (!savedSettings.hasHomeLocation || !savedSettings.hasWorkLocation) {
-                        Text(
-                            text = "집과 회사 위치를 먼저 설정해 주세요",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        Text("출근 버스 선택하기")
                     }
                 }
             }

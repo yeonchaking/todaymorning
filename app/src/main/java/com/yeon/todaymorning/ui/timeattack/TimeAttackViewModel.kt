@@ -117,9 +117,14 @@ class TimeAttackViewModel @Inject constructor(
 
                 when (s.missionTransitType) {
                     MissionTransitType.BUS ->
-                        results += transitRepository.getBusArrivals(s.missionStopId, s.missionRouteId)
+                        // 선택한 노선 전부 조회해 합산 (아무거나 타면 성공)
+                        s.missionRoutes.forEach { route ->
+                            results += transitRepository.getBusArrivals(s.missionStopId, route.routeId)
+                        }
                     MissionTransitType.SUBWAY ->
-                        results += transitRepository.getSubwayArrivals(s.missionStopId, s.missionRouteId)
+                        s.missionRoutes.forEach { route ->
+                            results += transitRepository.getSubwayArrivals(s.missionStopId, route.routeId)
+                        }
                     MissionTransitType.NONE -> {
                         _errorMessage.value = "설정에서 출근 경로를 먼저 탐색해 주세요."
                         return@launch
