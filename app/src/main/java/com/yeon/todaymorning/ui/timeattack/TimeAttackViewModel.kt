@@ -7,8 +7,8 @@ import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.data.repository.MissionRepository
 import com.yeon.todaymorning.data.repository.TransitRepository
 import com.yeon.todaymorning.domain.model.MissionState
+import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.TransitArrival
-import com.yeon.todaymorning.domain.model.TransitType
 import com.yeon.todaymorning.domain.model.UserSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -53,6 +53,10 @@ class TimeAttackViewModel @Inject constructor(
     private val _remainingSeconds = MutableStateFlow(0L)
     val remainingSeconds: StateFlow<Long> = _remainingSeconds.asStateFlow()
 
+    // 자동 새로고침까지 남은 초 (UI 표시용)
+    private val _refreshCountdown = MutableStateFlow(10)
+    val refreshCountdown: StateFlow<Int> = _refreshCountdown.asStateFlow()
+
     init {
         startCountdown()
         startPolling()
@@ -74,11 +78,8 @@ class TimeAttackViewModel @Inject constructor(
                 val remaining = (target - now) / 1000
                 _remainingSeconds.value = remaining
 
-                // 목표 시각 초과 → 자동 실패
-                if (remaining <= 0 && _missionState.value == MissionState.Active) {
-                    onMissionFail()
-                    break
-                }
+                // 미션 종료(성공 or 실패 확정)되면 타이머 중단
+                if (_missionState.value != MissionState.Active) break
                 delay(1000L)
             }
         }
@@ -86,9 +87,17 @@ class TimeAttackViewModel @Inject constructor(
 
     private fun startPolling() {
         viewModelScope.launch {
+            // DataStore 실제 설정값 로드 대기 후 첫 조회
+            // (init 시점엔 settings.value가 아직 기본값이라 빈 ID로 조회됨)
+            dataStore.userSettings.first()
+            fetchArrivals()
             while (true) {
+                // 10초 카운트다운 표시 후 갱신
+                for (i in 10 downTo 1) {
+                    _refreshCountdown.value = i
+                    delay(1_000L)
+                }
                 fetchArrivals()
-                delay(30_000L) // 30초마다 갱신
             }
         }
     }
@@ -101,16 +110,20 @@ class TimeAttackViewModel @Inject constructor(
                 val s = settings.value
                 val results = mutableListOf<TransitArrival>()
 
-                if (s.busStopId.isBlank() && s.subwayStationId.isBlank()) {
-                    _errorMessage.value = "설정에서 정류장/역 정보를 먼저 입력해주세요."
+                if (!s.hasMissionTarget) {
+                    _errorMessage.value = "설정에서 출근 경로를 먼저 탐색해 주세요."
                     return@launch
                 }
 
-                if (s.transitType == TransitType.BUS || s.transitType == TransitType.BOTH) {
-                    results += transitRepository.getBusArrivals(s.busStopId, s.busRouteId)
-                }
-                if (s.transitType == TransitType.SUBWAY || s.transitType == TransitType.BOTH) {
-                    results += transitRepository.getSubwayArrivals(s.subwayStationId, s.subwayLineId)
+                when (s.missionTransitType) {
+                    MissionTransitType.BUS ->
+                        results += transitRepository.getBusArrivals(s.missionStopId, s.missionRouteId)
+                    MissionTransitType.SUBWAY ->
+                        results += transitRepository.getSubwayArrivals(s.missionStopId, s.missionRouteId)
+                    MissionTransitType.NONE -> {
+                        _errorMessage.value = "설정에서 출근 경로를 먼저 탐색해 주세요."
+                        return@launch
+                    }
                 }
 
                 _arrivals.value = results.sortedBy { it.arrivalSeconds }

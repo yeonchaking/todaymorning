@@ -29,6 +29,7 @@ fun TimeAttackScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val remainingSeconds by viewModel.remainingSeconds.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val refreshCountdown by viewModel.refreshCountdown.collectAsState()
 
     // 미션 종료 시 결과 화면으로 이동
     LaunchedEffect(missionState) {
@@ -74,23 +75,65 @@ fun TimeAttackScreen(
                 }
             }
 
-            // ── 탑승 완료 버튼 ─────────────────────────────
+            // ── 탑승 완료 버튼 / 시간 초과 후 성공·실패 선택 ────
             if (missionState == MissionState.Active) {
                 item {
-                    Button(
-                        onClick = { viewModel.onBoardingSuccess() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(
-                            text = "✅ 탑승 완료!",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                    if (remainingSeconds > 0) {
+                        // 목표 시각 전: 탑승 완료 버튼
+                        Button(
+                            onClick = { viewModel.onBoardingSuccess() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(
+                                text = "✅ 탑승 완료!",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        // 목표 시각 지남: 직접 선택
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = "미션에 성공하셨나요?",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.onMissionFail() },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("❌ 실패")
+                                    }
+                                    Button(
+                                        onClick = { viewModel.onBoardingSuccess() },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("✅ 성공")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -110,8 +153,15 @@ fun TimeAttackScreen(
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     } else {
-                        TextButton(onClick = { viewModel.fetchArrivals() }) {
-                            Text("새로고침")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${refreshCountdown}초 뒤",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(onClick = { viewModel.fetchArrivals() }) {
+                                Text("새로고침")
+                            }
                         }
                     }
                 }
@@ -201,21 +251,22 @@ private fun CountdownCard(
             Text(
                 text = when {
                     missionState == MissionState.Success -> "✅ 탑승 성공!"
-                    missionState == MissionState.Failed -> "❌ 시간 초과"
-                    isOverdue -> "⚠️ +$timeText 초과"
+                    missionState == MissionState.Failed -> "❌ 미션 실패"
                     else -> timeText
                 },
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            if (missionState == MissionState.Active && !isOverdue) {
-                Text(
-                    text = "남은 시간",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = when {
+                    missionState == MissionState.Active && isOverdue -> "지남"
+                    missionState == MissionState.Active && !isOverdue -> "남은 시간"
+                    else -> ""
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
