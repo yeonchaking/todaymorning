@@ -3,11 +3,12 @@ package com.yeon.todaymorning.data.datastore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.yeon.todaymorning.domain.model.TransitType
+import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -21,14 +22,21 @@ class UserSettingsDataStore(private val context: Context) {
         val ALARM_MINUTE = intPreferencesKey("alarm_minute")
         val TARGET_HOUR = intPreferencesKey("target_hour")
         val TARGET_MINUTE = intPreferencesKey("target_minute")
-        val TRANSIT_TYPE = stringPreferencesKey("transit_type")
-        val BUS_STOP_ID = stringPreferencesKey("bus_stop_id")
-        val BUS_STOP_NAME = stringPreferencesKey("bus_stop_name")
-        val BUS_ROUTE_ID = stringPreferencesKey("bus_route_id")
-        val BUS_ROUTE_NAME = stringPreferencesKey("bus_route_name")
-        val BUS_DIRECTION = stringPreferencesKey("bus_direction")
-        val SUBWAY_STATION_ID = stringPreferencesKey("subway_station_id")
-        val SUBWAY_LINE_ID = stringPreferencesKey("subway_line_id")
+
+        val HOME_LAT = doublePreferencesKey("home_lat")
+        val HOME_LNG = doublePreferencesKey("home_lng")
+        val HOME_ADDRESS = stringPreferencesKey("home_address")
+
+        val WORK_LAT = doublePreferencesKey("work_lat")
+        val WORK_LNG = doublePreferencesKey("work_lng")
+        val WORK_ADDRESS = stringPreferencesKey("work_address")
+
+        val MISSION_TRANSIT_TYPE = stringPreferencesKey("mission_transit_type")
+        val MISSION_STOP_ID = stringPreferencesKey("mission_stop_id")
+        val MISSION_ROUTE_ID = stringPreferencesKey("mission_route_id")
+        val MISSION_ROUTE_NAME = stringPreferencesKey("mission_route_name")
+        val MISSION_STOP_NAME = stringPreferencesKey("mission_stop_name")
+        val MISSION_DIRECTION = stringPreferencesKey("mission_direction")
     }
 
     val userSettings: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -37,14 +45,20 @@ class UserSettingsDataStore(private val context: Context) {
             alarmMinute = prefs[ALARM_MINUTE] ?: 0,
             targetHour = prefs[TARGET_HOUR] ?: 9,
             targetMinute = prefs[TARGET_MINUTE] ?: 0,
-            transitType = TransitType.valueOf(prefs[TRANSIT_TYPE] ?: TransitType.BUS.name),
-            busStopId = prefs[BUS_STOP_ID] ?: "",
-            busStopName = prefs[BUS_STOP_NAME] ?: "",
-            busRouteId = prefs[BUS_ROUTE_ID] ?: "",
-            busRouteName = prefs[BUS_ROUTE_NAME] ?: "",
-            busDirection = prefs[BUS_DIRECTION] ?: "",
-            subwayStationId = prefs[SUBWAY_STATION_ID] ?: "",
-            subwayLineId = prefs[SUBWAY_LINE_ID] ?: ""
+            homeLat = prefs[HOME_LAT] ?: 0.0,
+            homeLng = prefs[HOME_LNG] ?: 0.0,
+            homeAddress = prefs[HOME_ADDRESS] ?: "",
+            workLat = prefs[WORK_LAT] ?: 0.0,
+            workLng = prefs[WORK_LNG] ?: 0.0,
+            workAddress = prefs[WORK_ADDRESS] ?: "",
+            missionTransitType = MissionTransitType.valueOf(
+                prefs[MISSION_TRANSIT_TYPE] ?: MissionTransitType.NONE.name
+            ),
+            missionStopId = prefs[MISSION_STOP_ID] ?: "",
+            missionRouteId = prefs[MISSION_ROUTE_ID] ?: "",
+            missionRouteName = prefs[MISSION_ROUTE_NAME] ?: "",
+            missionStopName = prefs[MISSION_STOP_NAME] ?: "",
+            missionDirection = prefs[MISSION_DIRECTION] ?: ""
         )
     }
 
@@ -54,14 +68,18 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[ALARM_MINUTE] = settings.alarmMinute
             prefs[TARGET_HOUR] = settings.targetHour
             prefs[TARGET_MINUTE] = settings.targetMinute
-            prefs[TRANSIT_TYPE] = settings.transitType.name
-            prefs[BUS_STOP_ID] = settings.busStopId
-            prefs[BUS_STOP_NAME] = settings.busStopName
-            prefs[BUS_ROUTE_ID] = settings.busRouteId
-            prefs[BUS_ROUTE_NAME] = settings.busRouteName
-            prefs[BUS_DIRECTION] = settings.busDirection
-            prefs[SUBWAY_STATION_ID] = settings.subwayStationId
-            prefs[SUBWAY_LINE_ID] = settings.subwayLineId
+            prefs[HOME_LAT] = settings.homeLat
+            prefs[HOME_LNG] = settings.homeLng
+            prefs[HOME_ADDRESS] = settings.homeAddress
+            prefs[WORK_LAT] = settings.workLat
+            prefs[WORK_LNG] = settings.workLng
+            prefs[WORK_ADDRESS] = settings.workAddress
+            prefs[MISSION_TRANSIT_TYPE] = settings.missionTransitType.name
+            prefs[MISSION_STOP_ID] = settings.missionStopId
+            prefs[MISSION_ROUTE_ID] = settings.missionRouteId
+            prefs[MISSION_ROUTE_NAME] = settings.missionRouteName
+            prefs[MISSION_STOP_NAME] = settings.missionStopName
+            prefs[MISSION_DIRECTION] = settings.missionDirection
         }
     }
 }

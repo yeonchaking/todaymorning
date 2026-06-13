@@ -7,3 +7,6 @@ data class TransitArrival(
     val arrivalSeconds: Int,    // 도착까지 남은 초
     val arrivalMessage: String  // "3분 후" 등 표시용 문자열
 )
+
+/** 도착 정보 카드 UI에서 버스/지하철 배지 구분용 */
+enum class TransitType { BUS, SUBWAY }
