@@ -118,10 +118,11 @@ class TransitRepository @Inject constructor(
 
     suspend fun getSubwayArrivals(stationName: String, lineId: String): List<SubwayArrival> {
         val apiKey = BuildConfig.SUBWAY_API_KEY
-        if (apiKey.isBlank() || stationName.isBlank()) return emptyList()
+        val queryName = normalizeStationName(stationName)
+        if (apiKey.isBlank() || queryName.isBlank()) return emptyList()
 
         return try {
-            val response = subwayApiService.getArrivalByStation(apiKey, stationName)
+            val response = subwayApiService.getArrivalByStation(apiKey, queryName)
             val items = response.realtimeArrivalList ?: emptyList()
 
             items
@@ -160,6 +161,26 @@ class TransitRepository @Inject constructor(
             minutes * 60
         }
         else -> -1
+    }
+
+    /**
+     * 서울 지하철 실시간 도착 API는 역명을 "역" 접미사·괄호 표기 없이 받는다.
+     * T-map이 주는 start.name이 "강남역", "시청(2호선)", "총신대입구(이수)역" 등으로
+     * 올 수 있으므로 조회용 역명으로 정규화한다.
+     *  - 괄호 표기 제거: "시청(2호선)" → "시청"
+     *  - 끝의 "역" 제거: "강남역" → "강남"  (단, 한 글자만 남는 경우는 보존)
+     *  - 공백 정리
+     */
+    private fun normalizeStationName(raw: String): String {
+        var name = raw.trim()
+        if (name.isEmpty()) return name
+        // 괄호(소·중) 안 부가정보 제거
+        name = name.replace(Regex("[(\\[（].*?[)\\]）]"), "").trim()
+        // 끝의 "역" 한 글자 제거 (역명이 비어버리는 것 방지)
+        if (name.length > 1 && name.endsWith("역")) {
+            name = name.dropLast(1)
+        }
+        return name.trim()
     }
 
     private fun String.toLineName(): String = when (this) {
