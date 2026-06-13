@@ -2,6 +2,8 @@ package com.yeon.todaymorning.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -54,20 +56,14 @@ fun NavGraph(
             val handle = backStackEntry.savedStateHandle
 
             // 집 위치 결과 수신
-            val homeLat by handle.getStateFlow("home_lat", 0.0)
-                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
-            val homeLng by handle.getStateFlow("home_lng", 0.0)
-                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
-            val homeAddress by handle.getStateFlow("home_address", "")
-                .let { androidx.compose.runtime.collectAsState(it, "") }
+            val homeLat by handle.getStateFlow("home_lat", 0.0).collectAsState()
+            val homeLng by handle.getStateFlow("home_lng", 0.0).collectAsState()
+            val homeAddress by handle.getStateFlow("home_address", "").collectAsState()
 
             // 회사 위치 결과 수신
-            val workLat by handle.getStateFlow("work_lat", 0.0)
-                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
-            val workLng by handle.getStateFlow("work_lng", 0.0)
-                .let { androidx.compose.runtime.collectAsState(it, 0.0) }
-            val workAddress by handle.getStateFlow("work_address", "")
-                .let { androidx.compose.runtime.collectAsState(it, "") }
+            val workLat by handle.getStateFlow("work_lat", 0.0).collectAsState()
+            val workLng by handle.getStateFlow("work_lng", 0.0).collectAsState()
+            val workAddress by handle.getStateFlow("work_address", "").collectAsState()
 
             val settingsViewModel: SettingsViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 
