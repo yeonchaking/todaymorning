@@ -107,7 +107,9 @@ class TimeAttackViewModel @Inject constructor(
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val s = settings.value
+                // settings StateFlow는 진입 직후 아직 기본값(hasMissionTarget=false)일 수 있어
+                // '설정 안됨' 오류가 잠깐 떴다 사라진다. DataStore 실제 저장값을 직접 읽어 방지.
+                val s = dataStore.userSettings.first()
                 val results = mutableListOf<TransitArrival>()
 
                 if (!s.hasMissionTarget) {

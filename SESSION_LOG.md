@@ -6,6 +6,26 @@
 
 ---
 
+## [2026-06-15] 버스선택 지도 진입 시 현위치 자동 이동 + 타임어택 첫 조회 stale settings 수정
+
+**방향/목표:** 두 진입 지점의 "첫 화면이 잘못된 상태로 떴다가 늦게 정상화되는" 체감 버그를 제거. (1) 버스선택 지도가 기본 좌표에 머무는 문제, (2) 알람→타임어택 진입 직후 도착정보 대신 "설정 안됨" 오류가 깜빡이는 문제.
+
+**결정 사항:**
+- **버스선택 지도는 진입 시 1회 현위치로 자동 이동한다** — 이유: 기존엔 `onMapReady`가 `DEFAULT_CENTER`(서울시청)만 로드하고 현위치 이동은 "내 주변" FAB 수동 조작에만 의존. 사용자가 매번 손으로 눌러야 했음. 자동 이동을 추가하되 기존 FAB는 수동 재호출용으로 유지.
+- **자동 이동은 권한 분기를 그대로 재사용한다** — 이유: 권한 있으면 즉시 `moveToMyLocation`, 없으면 기존 `locationPermissionLauncher`로 요청 후 허용 시 이동. 별도 권한 로직 추가 없이 1회성 트리거(`didAutoLocate`)만 얹음.
+- **타임어택 첫 조회는 StateFlow 캐시값이 아니라 DataStore 실제값을 읽는다** — 이유: `fetchArrivals()`가 `settings.value`를 읽었는데, `stateIn`의 initialValue가 기본 `UserSettings()`(hasMissionTarget=false)라 진입 직후 첫 조회가 "설정에서 출근 경로를 먼저 탐색" 오류를 띄우고, 다음 폴링(10초 후)에야 정상화되는 레이스였음. `dataStore.userSettings.first()`로 매 조회마다 실제 저장값을 직접 읽어 레이스를 원천 제거.
+
+**코드/프로젝트 변화:**
+- `BusSelectScreen`: `didAutoLocate` 플래그 + `LaunchedEffect(kakaoMap)` 신설 — 지도 준비되면 1회 권한 확인 후 현위치 이동(또는 권한 요청). 기존 FAB·DEFAULT_CENTER 초기 로드는 그대로(현위치 실패 시 폴백 역할).
+- `TimeAttackViewModel.fetchArrivals`: `val s = settings.value` → `val s = dataStore.userSettings.first()`. `startPolling`의 선행 `first()` 대기는 유지(무해).
+- (검증 한계) 샌드박스에 Android SDK 부재로 실제 빌드 미수행. import·참조 정합성만 확인. 실기기 동작 확인은 다음 단계.
+
+**[TODO 리스트 변경]:**
+- 해결: 없음
+- 추가: 없음 (기존 "미사용 위치 권한 정리" TODO는 이번 변경으로 위치 권한이 버스선택 자동 이동에 실제 사용되므로, "제거 또는 기능 확정" 중 **기능 확정** 쪽으로 기운다 — 항목 문구는 유지)
+
+---
+
 ## [2026-06-15] 알람 매일 반복 결함 수정 — 발생 시점 자동 재등록으로 전환 (0순위 해결)
 
 **방향/목표:** "한 번 울리면 끝"이던 1회성 알람을, 매일 같은 시각에 반복되도록 만든다. 핵심은 `setAlarmClock`/`setExact`가 1회성이라는 제약을 "발생 시점에 다음날을 다시 등록"하는 패턴으로 우회하는 것.

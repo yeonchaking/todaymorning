@@ -67,6 +67,23 @@ fun BusSelectScreen(
         if (result.values.any { it }) moveToMyLocation(context, kakaoMap, viewModel)
     }
 
+    // 지도 진입 시 1회: 현위치로 자동 이동 (권한 있으면 바로, 없으면 요청)
+    var didAutoLocate by remember { mutableStateOf(false) }
+    LaunchedEffect(kakaoMap) {
+        if (kakaoMap == null || didAutoLocate) return@LaunchedEffect
+        didAutoLocate = true
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) moveToMyLocation(context, kakaoMap, viewModel)
+        else locationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
     // map.start() 콜백 (AndroidView factory에서 1회 호출)
     val readyCallback = remember {
         object : KakaoMapReadyCallback() {
