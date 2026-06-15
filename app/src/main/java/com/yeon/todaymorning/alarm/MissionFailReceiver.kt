@@ -43,6 +43,11 @@ class MissionFailReceiver : BroadcastReceiver() {
                         )
                     )
                 }
+
+                // 자동실패 알람도 1회성(setExact)이므로, 오늘분이 발생한 지금
+                // 다음날 목표 시각에 다시 등록해 매일 반복되게 한다.
+                AlarmScheduler(context)
+                    .scheduleDailyMissionFail(settings.targetHour, settings.targetMinute)
             } finally {
                 pending.finish()
             }

@@ -4,12 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yeon.todaymorning.alarm.AlarmScheduler
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
+import com.yeon.todaymorning.domain.model.MissionRoute
+import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.UserSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Calendar
 import javax.inject.Inject
 
 @HiltViewModel
@@ -27,29 +28,39 @@ class SettingsViewModel @Inject constructor(
     fun saveSettings(settings: UserSettings) {
         viewModelScope.launch {
             dataStore.saveSettings(settings)
-            rescheduleAlarm(settings.alarmHour, settings.alarmMinute)
-            rescheduleMissionFail(settings.targetHour, settings.targetMinute)
+            // 다음 발생 시각 계산·등록은 AlarmScheduler가 담당.
+            // 실제 매일 반복은 AlarmReceiver/MissionFailReceiver가 발생 시점에 재등록.
+            alarmScheduler.scheduleDailyAlarm(settings.alarmHour, settings.alarmMinute)
+            alarmScheduler.scheduleDailyMissionFail(settings.targetHour, settings.targetMinute)
         }
     }
 
-    private fun nextTriggerMillis(hour: Int, minute: Int): Long =
-        Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            // 이미 지난 시각이면 내일로
-            if (timeInMillis <= System.currentTimeMillis()) {
-                add(Calendar.DAY_OF_YEAR, 1)
-            }
-        }.timeInMillis
-
-    private fun rescheduleAlarm(hour: Int, minute: Int) {
-        alarmScheduler.scheduleAt(nextTriggerMillis(hour, minute))
+    /**
+     * 미션 타겟만 부분 저장. 시각 키를 건드리지 않고 알람도 재등록하지 않으므로,
+     * 설정 화면에서 저장 전 편집 중인 시각이 보존된다.
+     */
+    fun saveMissionTarget(
+        transitType: MissionTransitType,
+        stopId: String,
+        stopName: String,
+        routes: List<MissionRoute>
+    ) {
+        viewModelScope.launch {
+            dataStore.saveMissionTarget(transitType, stopId, stopName, routes)
+        }
     }
 
-    /** 목표 시각에 자동 실패 처리 알람 등록 (탑승 완료를 누르지 않은 경우 대비). */
-    private fun rescheduleMissionFail(hour: Int, minute: Int) {
-        alarmScheduler.scheduleMissionFailAt(nextTriggerMillis(hour, minute))
+    /** 집 위치만 부분 저장 (시각·알람 미변경). */
+    fun saveHomeLocation(lat: Double, lng: Double, address: String) {
+        viewModelScope.launch {
+            dataStore.saveHomeLocation(lat, lng, address)
+        }
+    }
+
+    /** 회사 위치만 부분 저장 (시각·알람 미변경). */
+    fun saveWorkLocation(lat: Double, lng: Double, address: String) {
+        viewModelScope.launch {
+            dataStore.saveWorkLocation(lat, lng, address)
+        }
     }
 }
