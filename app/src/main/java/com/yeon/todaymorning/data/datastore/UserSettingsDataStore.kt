@@ -84,4 +84,41 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[MISSION_ROUTES] = gson.toJson(settings.missionRoutes)
         }
     }
+
+    /**
+     * 미션 타겟(정류장/역 + 노선)만 부분 저장.
+     * 알람·목표 시각 키는 건드리지 않으므로, 설정 화면에서 저장 버튼을 누르기 전
+     * 편집 중인 시각이 이 저장으로 덮어써지지 않는다.
+     */
+    suspend fun saveMissionTarget(
+        transitType: MissionTransitType,
+        stopId: String,
+        stopName: String,
+        routes: List<MissionRoute>
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[MISSION_TRANSIT_TYPE] = transitType.name
+            prefs[MISSION_STOP_ID] = stopId
+            prefs[MISSION_STOP_NAME] = stopName
+            prefs[MISSION_ROUTES] = gson.toJson(routes)
+        }
+    }
+
+    /** 집 위치만 부분 저장 (시각 키 미변경). */
+    suspend fun saveHomeLocation(lat: Double, lng: Double, address: String) {
+        context.dataStore.edit { prefs ->
+            prefs[HOME_LAT] = lat
+            prefs[HOME_LNG] = lng
+            prefs[HOME_ADDRESS] = address
+        }
+    }
+
+    /** 회사 위치만 부분 저장 (시각 키 미변경). */
+    suspend fun saveWorkLocation(lat: Double, lng: Double, address: String) {
+        context.dataStore.edit { prefs ->
+            prefs[WORK_LAT] = lat
+            prefs[WORK_LNG] = lng
+            prefs[WORK_ADDRESS] = address
+        }
+    }
 }

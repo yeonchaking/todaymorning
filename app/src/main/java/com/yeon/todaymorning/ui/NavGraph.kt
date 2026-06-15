@@ -73,27 +73,14 @@ fun NavGraph(
             // 위치 변경 시 자동 저장
             LaunchedEffect(homeAddress) {
                 if (homeAddress.isNotBlank()) {
-                    val current = settingsViewModel.settings.value
-                    settingsViewModel.saveSettings(
-                        current.copy(
-                            homeLat = homeLat,
-                            homeLng = homeLng,
-                            homeAddress = homeAddress
-                        )
-                    )
+                    // 시각 키를 건드리지 않는 부분 저장 — 편집 중인 시각 보존
+                    settingsViewModel.saveHomeLocation(homeLat, homeLng, homeAddress)
                     handle["home_address"] = ""
                 }
             }
             LaunchedEffect(workAddress) {
                 if (workAddress.isNotBlank()) {
-                    val current = settingsViewModel.settings.value
-                    settingsViewModel.saveSettings(
-                        current.copy(
-                            workLat = workLat,
-                            workLng = workLng,
-                            workAddress = workAddress
-                        )
-                    )
+                    settingsViewModel.saveWorkLocation(workLat, workLng, workAddress)
                     handle["work_address"] = ""
                 }
             }
@@ -163,14 +150,12 @@ fun NavGraph(
                 )
             BusSelectScreen(
                 onPicked = { result ->
-                    val current = settingsViewModel.settings.value
-                    settingsViewModel.saveSettings(
-                        current.copy(
-                            missionTransitType = MissionTransitType.BUS,
-                            missionStopId = result.arsId,
-                            missionStopName = result.stopName,
-                            missionRoutes = result.routes
-                        )
+                    // 시각 키를 건드리지 않는 부분 저장 — 편집 중인 시각 보존
+                    settingsViewModel.saveMissionTarget(
+                        transitType = MissionTransitType.BUS,
+                        stopId = result.arsId,
+                        stopName = result.stopName,
+                        routes = result.routes
                     )
                     navController.popBackStack()
                 },

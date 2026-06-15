@@ -31,6 +31,28 @@
 
 ---
 
+## [2026-06-15] 설정 시각 편집이 버스/위치 선택 후 초기화되던 버그 수정
+
+**방향/목표:** 설정 화면에서 알람/목표 시각을 바꾼 뒤(저장 전) "출근 버스 다시 선택"을 다녀오면 편집한 시각이 이전 저장값으로 되돌아가는 버그를 코드에서 규명·수정.
+
+**결정 사항:**
+- 시각 즉시저장(A안)이 아니라 **명시적 저장 유지 + 부분 저장 분리(B안)** 채택 — 이유: 즉시저장은 "저장 및 알람 등록" 버튼에 묶인 유효성 검사(알람<목표)와 알람 재등록을 편집 도중에 트리거해버려 UX가 깨짐. 시각은 저장 버튼을 눌러야만 영속화되어야 함.
+- 버스/위치 저장을 `settings.value.copy(...) → saveSettings` 전체쓰기에서 **시각 키를 건드리지 않는 부분 저장**으로 전환 — 이유: 기존 방식은 미저장 옛 시각이 담긴 `settings.value`를 통째로 다시 써서 시각을 덮어씀.
+- 설정 화면의 시각 state를 `remember` → **`rememberSaveable`** 로 변경 — 이유: 버스 화면 이동 시 설정 composable이 dispose되어 `remember` 편집값이 소실되고 복귀 시 DataStore 값으로 재초기화됨(사용자 증상이 이 dispose를 입증). NavHost는 백스택에 남은 화면의 saveable 상태를 보관하므로 왕복에도 편집값 보존.
+
+**코드/프로젝트 변화:**
+- `UserSettingsDataStore`: 시각 키 미변경 부분 저장 메서드 3종 추가 — `saveMissionTarget`, `saveHomeLocation`, `saveWorkLocation`.
+- `SettingsViewModel`: 위 3종을 감싸 노출(알람 재등록 없음).
+- `NavGraph`: 버스 선택·집·회사 저장을 부분 저장 호출로 교체(옛 `settings.value.copy → saveSettings` 제거).
+- `SettingsScreen`: 알람/목표 시각 4개 state를 `rememberSaveable(저장된 시각값 key)` 로 변경. 저장 버튼·picker 로직은 그대로.
+- (확인) Compose BOM 2024.09.00(runtime 1.7.x)에서 `rememberSaveable { mutableIntStateOf() }` 정식 지원, ViewModel은 SETTINGS 백스택 엔트리에 스코프되어 왕복 중 유지됨.
+
+**[TODO 리스트 변경]:**
+- 해결: 없음 (이번 세션 내에서 발견·수정한 버그 — 기존 `TODO.md` 항목 아님)
+- 추가: 없음
+
+---
+
 ## [2026-06-13] TODO.md 백로그 신설 + 세션로그 TODO 운영모델 전환 (1.0 릴리즈 목표 수립)
 
 **방향/목표:** "한 바퀴 도는" 현재 앱을 Play Store 1.0으로 끌고 가기 위해, 출시에 부족한 부분을 외부(사용자·스토어) 관점에서 도출하고 살아있는 백로그를 세션로그에서 분리해 `TODO.md`로 단일화.

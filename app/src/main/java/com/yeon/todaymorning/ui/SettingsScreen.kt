@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -28,10 +29,23 @@ fun SettingsScreen(
 ) {
     val savedSettings by viewModel.settings.collectAsState()
 
-    var alarmHour by remember(savedSettings) { mutableIntStateOf(savedSettings.alarmHour) }
-    var alarmMinute by remember(savedSettings) { mutableIntStateOf(savedSettings.alarmMinute) }
-    var targetHour by remember(savedSettings) { mutableIntStateOf(savedSettings.targetHour) }
-    var targetMinute by remember(savedSettings) { mutableIntStateOf(savedSettings.targetMinute) }
+    // rememberSaveable: 버스/위치 선택 화면으로 이동했다 돌아와도(설정 composable이 dispose됐다
+    // 재생성돼도) 편집 중인(아직 저장 전) 시각이 보존된다. 일반 remember는 화면 전환 시 소실됨.
+    //
+    // key는 저장된 "시각" 값. 버스/위치 부분 저장으로 savedSettings가 재emit돼도 시각 필드는
+    // 그대로이므로 key 불변 → 보존된 편집값 복원. 최초 DataStore 로딩·실제 시각 저장 때만 재초기화.
+    var alarmHour by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) {
+        mutableIntStateOf(savedSettings.alarmHour)
+    }
+    var alarmMinute by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) {
+        mutableIntStateOf(savedSettings.alarmMinute)
+    }
+    var targetHour by rememberSaveable(savedSettings.targetHour, savedSettings.targetMinute) {
+        mutableIntStateOf(savedSettings.targetHour)
+    }
+    var targetMinute by rememberSaveable(savedSettings.targetHour, savedSettings.targetMinute) {
+        mutableIntStateOf(savedSettings.targetMinute)
+    }
 
     var showAlarmPicker by remember { mutableStateOf(false) }
     var showTargetPicker by remember { mutableStateOf(false) }
