@@ -41,12 +41,11 @@ import androidx.navigation.compose.rememberNavController
 import com.yeon.todaymorning.alarm.AlarmScheduler
 import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.domain.model.MissionTransitType
-import com.yeon.todaymorning.domain.model.UserLevel
 import com.yeon.todaymorning.domain.model.UserSettings
 import com.yeon.todaymorning.ui.main.MainViewModel
+import com.yeon.todaymorning.ui.main.MissionCalendar
 import com.yeon.todaymorning.ui.theme.TodayCommuteTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -190,14 +189,11 @@ fun MainScreen(
                 MissionCard(settings = settings)
             }
 
-            // 통계 카드 (레벨 / streak / 성공률)
+            // 미션 기록 달력 (연속 성공 일수 + 월별 성공/실패 마킹)
             item {
-                StatsCard(
+                MissionCalendar(
                     streak = uiState.streak,
-                    successRate = uiState.successRate,
-                    totalCount = uiState.totalCount,
-                    successCount = uiState.successCount,
-                    level = UserLevel.fromStreak(uiState.streak)
+                    records = uiState.allRecords
                 )
             }
 
@@ -327,95 +323,6 @@ private fun MissionCard(settings: UserSettings) {
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
-    }
-}
-
-@Composable
-private fun StatsCard(
-    streak: Int,
-    successRate: Float,
-    totalCount: Int,
-    successCount: Int,
-    level: UserLevel
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // 레벨 배지 행
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(text = level.emoji, style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = level.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = level.description,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            HorizontalDivider()
-
-            // 통계 수치 행
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(
-                    label = "연속 성공",
-                    value = "${streak}일",
-                    emoji = if (streak >= 7) "🔥" else if (streak >= 3) "⭐" else "📅"
-                )
-                VerticalDivider(
-                    modifier = Modifier.height(48.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                StatItem(
-                    label = "성공률",
-                    value = "${(successRate * 100).roundToInt()}%",
-                    emoji = "📊"
-                )
-                VerticalDivider(
-                    modifier = Modifier.height(48.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                StatItem(
-                    label = "총 기록",
-                    value = "${successCount}/${totalCount}",
-                    emoji = "✅"
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatItem(label: String, value: String, emoji: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = emoji, style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 

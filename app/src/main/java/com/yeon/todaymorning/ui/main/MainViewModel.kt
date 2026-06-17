@@ -17,10 +17,8 @@ import javax.inject.Inject
 
 data class MainUiState(
     val streak: Int = 0,
-    val successRate: Float = 0f,
     val recentRecords: List<MissionRecord> = emptyList(),
-    val totalCount: Int = 0,
-    val successCount: Int = 0
+    val allRecords: List<MissionRecord> = emptyList()
 )
 
 @HiltViewModel
@@ -49,19 +47,10 @@ class MainViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(recentRecords = records)
             }
         }
+        // 달력용: 과거 전체 기록
         viewModelScope.launch {
-            repository.getSuccessRate().collect { rate ->
-                _uiState.value = _uiState.value.copy(successRate = rate)
-            }
-        }
-        viewModelScope.launch {
-            repository.getSuccessCount().collect { count ->
-                _uiState.value = _uiState.value.copy(successCount = count)
-            }
-        }
-        viewModelScope.launch {
-            repository.getTotalCount().collect { count ->
-                _uiState.value = _uiState.value.copy(totalCount = count)
+            repository.getAllRecords().collect { records ->
+                _uiState.value = _uiState.value.copy(allRecords = records)
             }
         }
     }
