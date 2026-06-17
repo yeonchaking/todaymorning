@@ -22,6 +22,10 @@ interface MissionDao {
     @Query("SELECT * FROM mission_records WHERE date = :date LIMIT 1")
     suspend fun getRecordByDate(date: String): MissionRecord?
 
+    /** 선택한 id들의 기록을 삭제. */
+    @Query("DELETE FROM mission_records WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>): Int
+
     @Query("SELECT COUNT(*) FROM mission_records WHERE isSuccess = 1")
     fun getSuccessCount(): Flow<Int>
 

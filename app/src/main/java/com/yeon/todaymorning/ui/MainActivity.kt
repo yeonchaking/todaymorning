@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -197,18 +198,52 @@ fun MainScreen(
                 )
             }
 
-            // 최근 기록 헤더
+            // 최근 기록 헤더 + 편집/삭제 버튼
             if (uiState.recentRecords.isNotEmpty()) {
                 item {
-                    Text(
-                        text = "최근 기록",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "최근 기록",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        val selectedCount = uiState.selectedIds.size
+                        when {
+                            !uiState.isEditMode -> {
+                                TextButton(onClick = { viewModel.toggleEditMode() }) {
+                                    Text("편집")
+                                }
+                            }
+                            selectedCount > 0 -> {
+                                TextButton(onClick = { viewModel.deleteSelected() }) {
+                                    Text(
+                                        text = "${selectedCount}개 삭제",
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            else -> {
+                                TextButton(onClick = { viewModel.toggleEditMode() }) {
+                                    Text("취소")
+                                }
+                            }
+                        }
+                    }
                 }
-                items(uiState.recentRecords) { record ->
-                    MissionRecordItem(record = record)
+                items(uiState.recentRecords, key = { it.id }) { record ->
+                    MissionRecordItem(
+                        record = record,
+                        isEditMode = uiState.isEditMode,
+                        isSelected = record.id in uiState.selectedIds,
+                        onToggleSelect = { viewModel.toggleSelection(record.id) }
+                    )
                 }
             } else {
                 item {
@@ -327,12 +362,20 @@ private fun MissionCard(settings: UserSettings) {
 }
 
 @Composable
-private fun MissionRecordItem(record: MissionRecord) {
+private fun MissionRecordItem(
+    record: MissionRecord,
+    isEditMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {}
+) {
     val isSuccess = record.isSuccess
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
+            .then(
+                if (isEditMode) Modifier.clickable { onToggleSelect() } else Modifier
+            )
             .background(
                 if (isSuccess) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                 else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
@@ -342,6 +385,18 @@ private fun MissionRecordItem(record: MissionRecord) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (isEditMode) {
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelect() },
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
             Text(text = if (isSuccess) "✅" else "❌", style = MaterialTheme.typography.bodyLarge)
             Column {
                 Text(

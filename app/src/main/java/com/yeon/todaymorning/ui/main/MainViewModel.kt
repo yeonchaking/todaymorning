@@ -18,7 +18,9 @@ import javax.inject.Inject
 data class MainUiState(
     val streak: Int = 0,
     val recentRecords: List<MissionRecord> = emptyList(),
-    val allRecords: List<MissionRecord> = emptyList()
+    val allRecords: List<MissionRecord> = emptyList(),
+    val isEditMode: Boolean = false,
+    val selectedIds: Set<Long> = emptySet()
 )
 
 @HiltViewModel
@@ -59,6 +61,33 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val streak = repository.getCurrentStreak()
             _uiState.value = _uiState.value.copy(streak = streak)
+        }
+    }
+
+    /** 편집 모드 토글. 끌 때 선택 초기화. */
+    fun toggleEditMode() {
+        _uiState.value = _uiState.value.copy(
+            isEditMode = !_uiState.value.isEditMode,
+            selectedIds = emptySet()
+        )
+    }
+
+    /** 기록 선택/해제. */
+    fun toggleSelection(id: Long) {
+        val current = _uiState.value.selectedIds
+        _uiState.value = _uiState.value.copy(
+            selectedIds = if (id in current) current - id else current + id
+        )
+    }
+
+    /** 선택한 기록 삭제 후 편집 모드 종료 + streak 재계산. */
+    fun deleteSelected() {
+        val ids = _uiState.value.selectedIds.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.deleteRecords(ids)
+            _uiState.value = _uiState.value.copy(isEditMode = false, selectedIds = emptySet())
+            refreshStreak()
         }
     }
 }

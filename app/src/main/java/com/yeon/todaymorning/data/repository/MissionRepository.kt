@@ -26,6 +26,9 @@ class MissionRepository @Inject constructor(
 
     suspend fun getRecordByDate(date: String): MissionRecord? = dao.getRecordByDate(date)
 
+    /** 선택한 id들의 기록을 삭제. */
+    suspend fun deleteRecords(ids: List<Long>): Int = dao.deleteByIds(ids)
+
     /**
      * 오늘 미션 결과를 안전하게 기록한다.
      *
