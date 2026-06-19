@@ -28,4 +28,45 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = Color(0xFF5A5E67),
     outline = Color(0xFFD5DBE6),
     error = Color(0xFFD92D20),
-    errorContainer = Color
+    errorContainer = Color(0xFFFCDAD7),
+    onErrorContainer = Color(0xFF410E0B),
+)
+
+private val DarkColorScheme = darkColorScheme(
+    primary = Color(0xFFA8C8FF),
+    onPrimary = Color(0xFF06305F),
+    primaryContainer = Color(0xFF274C88),
+    onPrimaryContainer = Color(0xFFD8E2FF),
+    secondary = Color(0xFFB9A2F0),
+    onSecondary = Color(0xFF2A1E55),
+    secondaryContainer = Color(0xFF352C50),
+    onSecondaryContainer = Color(0xFFDCD0F8),
+    tertiary = Color(0xFFF0B84A),
+    background = Color(0xFF0E1116),
+    onBackground = Color(0xFFE4E6EB),
+    surface = Color(0xFF171B21),
+    onSurface = Color(0xFFE4E6EB),
+    surfaceVariant = Color(0xFF1F242C),
+    onSurfaceVariant = Color(0xFFA7ACB6),
+    outline = Color(0xFF333A44),
+    error = Color(0xFFFF8077),
+    errorContainer = Color(0xFF4A1F1B),
+    onErrorContainer = Color(0xFFFFDAD6),
+)
+
+@Composable
+fun TodayCommuteTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val appColors = if (darkTheme) DarkAppColors else LightAppColors
+
+    CompositionLocalProvider(LocalAppColors provides appColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = TodayCommuteTypography,
+            content = content
+        )
+    }
+}
