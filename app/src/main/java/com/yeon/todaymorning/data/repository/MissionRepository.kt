@@ -47,22 +47,27 @@ class MissionRepository @Inject constructor(
         }
     }
 
-    /** 오늘 포함 최근 연속 성공 streak 계산 */
+    /**
+     * 오늘 포함 최근 연속 성공 streak 계산.
+     *
+     * "도전한 날"만 센다 — 기록이 없는 날(주말 등 아예 미션을 켜지 않은 날)은
+     * streak를 끊지 않고 건너뛴다. 실패 기록이 있는 날에서만 streak가 중단된다.
+     */
     suspend fun getCurrentStreak(): Int {
         var streak = 0
         val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val cal = Calendar.getInstance()
 
-        // 오늘부터 하루씩 거슬러 올라가며 성공 기록 확인
+        // 오늘부터 하루씩 거슬러 올라가며 확인
         for (i in 0 until 365) {
             val dateStr = fmt.format(cal.time)
             val record = dao.getRecordByDate(dateStr)
-            if (record != null && record.isSuccess) {
-                streak++
-                cal.add(Calendar.DAY_OF_YEAR, -1)
-            } else {
-                break
+            when {
+                record == null -> { /* 도전 안 한 날 — 건너뜀(streak 유지) */ }
+                record.isSuccess -> streak++
+                else -> break   // 실패한 날 — streak 중단
             }
+            cal.add(Calendar.DAY_OF_YEAR, -1)
         }
         return streak
     }

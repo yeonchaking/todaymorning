@@ -46,7 +46,8 @@ import java.time.YearMonth
 fun MissionCalendar(
     streak: Int,
     records: List<MissionRecord>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showStreakHeader: Boolean = true
 ) {
     // date("yyyy-MM-dd") -> isSuccess. 같은 날 중복 시 성공 우선.
     val resultByDate = remember(records) {
@@ -64,26 +65,28 @@ fun MissionCalendar(
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
 
-            // 연속 성공 일수
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (streak >= 7) "🔥" else if (streak >= 3) "⭐" else "📅",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(Modifier.size(6.dp))
-                Text(
-                    text = "현재 ${streak}일 연속 성공",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            // 연속 성공 일수 (홈 히어로에 이미 표시되면 생략)
+            if (showStreakHeader) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (streak >= 7) "🔥" else if (streak >= 3) "⭐" else "📅",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        text = "현재 ${streak}일 연속 성공",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
 
-            Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
+            }
 
             // 월 이동 헤더
             Row(

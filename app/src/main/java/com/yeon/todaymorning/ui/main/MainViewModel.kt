@@ -5,6 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.data.repository.MissionRepository
+import com.yeon.todaymorning.domain.model.BadgeUi
+import com.yeon.todaymorning.domain.model.DayStatus
+import com.yeon.todaymorning.domain.model.LevelInfo
+import com.yeon.todaymorning.domain.model.LevelSystem
+import com.yeon.todaymorning.domain.model.POINTS_PER_SUCCESS
 import com.yeon.todaymorning.domain.model.UserSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 import javax.inject.Inject
 
 data class MainUiState(
@@ -20,7 +28,15 @@ data class MainUiState(
     val recentRecords: List<MissionRecord> = emptyList(),
     val allRecords: List<MissionRecord> = emptyList(),
     val isEditMode: Boolean = false,
-    val selectedIds: Set<Long> = emptySet()
+    val selectedIds: Set<Long> = emptySet(),
+
+    // ── 게이미피케이션(파생) ──────────────────────────────
+    val level: LevelInfo = LevelInfo(level = 1, points = 0, progress = 0f, pointsToNext = 400),
+    val weekly: List<DayStatus> = List(7) { DayStatus.NONE }, // 월~일
+    val weekSuccess: Int = 0,
+    val weekTotal: Int = 0,
+    val badges: List<BadgeUi> = emptyList(),
+    val todayLabel: String = "",   // "목요일"
 )
 
 @HiltViewModel
@@ -49,10 +65,11 @@ class MainViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(recentRecords = records)
             }
         }
-        // 달력용: 과거 전체 기록
+        // 달력·게이미피케이션용: 과거 전체 기록
         viewModelScope.launch {
             repository.getAllRecords().collect { records ->
                 _uiState.value = _uiState.value.copy(allRecords = records)
+                recomputeDerived()
             }
         }
     }
@@ -61,7 +78,57 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val streak = repository.getCurrentStreak()
             _uiState.value = _uiState.value.copy(streak = streak)
+            recomputeDerived()
         }
+    }
+
+    /** 기록·streak에서 포인트·레벨·주간현황·배지를 다시 계산한다. */
+    private fun recomputeDerived() {
+        val s = _uiState.value
+        val records = s.allRecords
+        val successCount = records.count { it.isSuccess }
+        val points = successCount * POINTS_PER_SUCCESS
+        val level = LevelSystem.fromPoints(points)
+
+        val today = LocalDate.now()
+        val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
+        // 날짜 → 성공여부 (같은 날 성공이 하나라도 있으면 성공 우선)
+        val resultByDate = HashMap<LocalDate, Boolean>()
+        for (r in records) {
+            val d = runCatching { LocalDate.parse(r.date) }.getOrNull() ?: continue
+            resultByDate[d] = (resultByDate[d] ?: false) || r.isSuccess
+        }
+        val weekly = (0..6).map { offset ->
+            val d = monday.plusDays(offset.toLong())
+            when {
+                d.isAfter(today) -> DayStatus.FUTURE
+                d.isEqual(today) -> DayStatus.TODAY
+                resultByDate.containsKey(d) ->
+                    if (resultByDate[d] == true) DayStatus.SUCCESS else DayStatus.FAIL
+                else -> DayStatus.NONE
+            }
+        }
+        val weekSuccess = weekly.count { it == DayStatus.SUCCESS }
+        val weekTotal = weekly.count { it == DayStatus.SUCCESS || it == DayStatus.FAIL }
+        val perfectWeek = weekSuccess >= 5
+
+        val badges = listOf(
+            BadgeUi("early_bird", "얼리버드", "🌅", successCount >= 1),
+            BadgeUi("streak7", "7일 연속", "🔥", s.streak >= 7),
+            BadgeUi("perfect_week", "완벽한 주", "🏅", perfectWeek),
+            BadgeUi("streak30", "30일", "👑", s.streak >= 30),
+        )
+
+        val todayLabel = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.KOREAN)
+
+        _uiState.value = _uiState.value.copy(
+            level = level,
+            weekly = weekly,
+            weekSuccess = weekSuccess,
+            weekTotal = weekTotal,
+            badges = badges,
+            todayLabel = todayLabel,
+        )
     }
 
     /** 편집 모드 토글. 끌 때 선택 초기화. */
