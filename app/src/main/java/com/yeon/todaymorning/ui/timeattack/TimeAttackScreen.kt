@@ -1,12 +1,17 @@
 package com.yeon.todaymorning.ui.timeattack
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -14,10 +19,15 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yeon.todaymorning.domain.model.MissionState
 import com.yeon.todaymorning.domain.model.TransitArrival
-import com.yeon.todaymorning.domain.model.TransitType
+import com.yeon.todaymorning.ui.theme.AppTheme
 import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val HeroSuccess = Color(0xFF1B7D33)
+private val HeroAmber = Color(0xFFB5740A)
+private val HeroDanger = Color(0xFFC5291C)
+
+private data class Signal(val color: Color, val emoji: String, val text: String)
+
 @Composable
 fun TimeAttackScreen(
     onMissionComplete: (isSuccess: Boolean) -> Unit,
@@ -30,331 +40,233 @@ fun TimeAttackScreen(
     val remainingSeconds by viewModel.remainingSeconds.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val refreshCountdown by viewModel.refreshCountdown.collectAsState()
+    val c = AppTheme.colors
 
-    // 미션 종료 시 결과 화면으로 이동
     LaunchedEffect(missionState) {
         if (missionState == MissionState.Success || missionState == MissionState.Failed) {
-            kotlinx.coroutines.delay(600L) // 상태 변화를 잠깐 보여주고 이동
+            kotlinx.coroutines.delay(600L)
             onMissionComplete(missionState == MissionState.Success)
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("오늘도출근 🚌") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            // ── 카운트다운 타이머 ───────────────────────────
-            item {
-                CountdownCard(
-                    remainingSeconds = remainingSeconds,
-                    targetHour = settings.targetHour,
-                    targetMinute = settings.targetMinute,
-                    missionState = missionState
-                )
-            }
-
-            // ── 미션 결과 ──────────────────────────────────
-            if (missionState == MissionState.Success || missionState == MissionState.Failed) {
-                item {
-                    MissionResultCard(missionState = missionState)
-                }
-            }
-
-            // ── 탑승 완료 버튼 / 시간 초과 후 성공·실패 선택 ────
-            if (missionState == MissionState.Active) {
-                item {
-                    if (remainingSeconds > 0) {
-                        // 목표 시각 전: 탑승 완료 버튼
-                        Button(
-                            onClick = { viewModel.onBoardingSuccess() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Text(
-                                text = "✅ 탑승 완료!",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    } else {
-                        // 목표 시각 지남: 직접 선택
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "미션에 성공하셨나요?",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.onMissionFail() },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("❌ 실패")
-                                    }
-                                    Button(
-                                        onClick = { viewModel.onBoardingSuccess() },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("✅ 성공")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── 도착 정보 헤더 ─────────────────────────────
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "실시간 도착 정보",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "${refreshCountdown}초 뒤",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            TextButton(onClick = { viewModel.fetchArrivals() }) {
-                                Text("새로고침")
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── 오류 메시지 ────────────────────────────────
-            if (errorMessage != null) {
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = errorMessage!!,
-                            modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            // ── 도착 카드 목록 ─────────────────────────────
-            if (arrivals.isEmpty() && !isLoading && errorMessage == null) {
-                item {
-                    Text(
-                        text = "도착 정보를 불러오는 중...",
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            items(arrivals) { arrival ->
-                ArrivalCard(arrival = arrival)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CountdownCard(
-    remainingSeconds: Long,
-    targetHour: Int,
-    targetMinute: Int,
-    missionState: MissionState
-) {
-    val isOverdue = remainingSeconds < 0
-    val absSeconds = abs(remainingSeconds)
-    val hours = absSeconds / 3600
-    val minutes = (absSeconds % 3600) / 60
-    val seconds = absSeconds % 60
-
-    val timeText = if (hours > 0) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%02d:%02d".format(minutes, seconds)
+    // 신호등 상태
+    val signal = when {
+        missionState == MissionState.Success -> Signal(HeroSuccess, "✅", "탑승 성공!")
+        missionState == MissionState.Failed -> Signal(HeroDanger, "😢", "미션 실패")
+        remainingSeconds <= 0 -> Signal(HeroDanger, "⏰", "시간이 지났어요")
+        remainingSeconds < 300 -> Signal(HeroDanger, "🏃", "지금 출발하세요")
+        remainingSeconds < 600 -> Signal(HeroAmber, "🚶", "곧 출발하세요")
+        else -> Signal(HeroSuccess, "✅", "여유 있어요")
     }
 
-    val containerColor = when {
-        missionState == MissionState.Success -> MaterialTheme.colorScheme.primaryContainer
-        missionState == MissionState.Failed -> MaterialTheme.colorScheme.errorContainer
-        isOverdue -> MaterialTheme.colorScheme.errorContainer
-        remainingSeconds < 300 -> MaterialTheme.colorScheme.tertiaryContainer // 5분 미만: 경고
-        else -> MaterialTheme.colorScheme.primaryContainer
+    // 막차: 목표시각 전(잔여시간 내)에 도착하는 버스 중 가장 늦게 오는 것.
+    val lastBoardableSeconds = remember(arrivals, remainingSeconds) {
+        arrivals.map { it.arrivalSeconds }
+            .filter { it in 0..remainingSeconds.toInt() }
+            .maxOrNull()
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
-    ) {
+    Column(modifier = Modifier.fillMaxSize().background(c.appBg)) {
+
+        // ── 히어로 (신호등) ──────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .background(signal.color)
+                .statusBarsPadding()
+                .padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "목표 탑승 시각 %02d:%02d".format(targetHour, targetMinute),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "목표 탑승 %02d:%02d까지".format(settings.targetHour, settings.targetMinute),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White.copy(alpha = 0.92f)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
-                text = when {
-                    missionState == MissionState.Success -> "✅ 탑승 성공!"
-                    missionState == MissionState.Failed -> "❌ 미션 실패"
-                    else -> timeText
-                },
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                text = formatCountdown(remainingSeconds),
+                fontSize = 72.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
             )
-            Text(
-                text = when {
-                    missionState == MissionState.Active && isOverdue -> "지남"
-                    missionState == MissionState.Active && !isOverdue -> "남은 시간"
-                    else -> ""
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .padding(horizontal = 18.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                Text(signal.emoji, fontSize = 20.sp)
+                Text(signal.text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
         }
-    }
-}
 
-@Composable
-private fun MissionResultCard(missionState: MissionState) {
-    val isSuccess = missionState == MissionState.Success
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSuccess) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Text(
-            text = if (isSuccess) "🎉 오늘도 출근 성공! 잠시 후 돌아갑니다." else "😢 내일은 꼭 성공해요! 잠시 후 돌아갑니다.",
-            modifier = Modifier.padding(16.dp),
-            style = MaterialTheme.typography.titleMedium,
-            color = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer
-            else MaterialTheme.colorScheme.onErrorContainer
-        )
-    }
-}
-
-@Composable
-private fun ArrivalCard(arrival: TransitArrival) {
-    val isUrgent = arrival.arrivalSeconds in 0..180 // 3분 이내
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isUrgent) MaterialTheme.colorScheme.tertiaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Row(
+        // ── 중간 스크롤 영역 ─────────────────────────────
+        Column(
             modifier = Modifier
+                .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(13.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 타입 배지
-                    Surface(
-                        color = if (arrival.type == TransitType.BUS)
-                            MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.secondary,
-                        shape = MaterialTheme.shapes.small
+            // 실시간 도착
+            Surface(shape = RoundedCornerShape(20.dp), color = c.surface, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 13.dp, bottom = 11.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text("실시간 도착", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.on)
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(c.success))
+                                Text("LIVE", fontSize = 12.sp, color = c.onVar)
+                            }
+                        }
+                    }
+                    if (arrivals.isEmpty() && errorMessage == null) {
                         Text(
-                            text = if (arrival.type == TransitType.BUS) "버스" else "지하철",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            text = if (isLoading) "도착 정보를 불러오는 중..." else "도착 정보가 없습니다",
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            textAlign = TextAlign.Center, fontSize = 13.sp, color = c.onVar
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = arrival.routeName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    arrivals.forEach { arrival ->
+                        ArrivalRow(
+                            arrival = arrival,
+                            isLast = lastBoardableSeconds != null && arrival.arrivalSeconds == lastBoardableSeconds
+                        )
+                    }
                 }
-                Text(
-                    text = "→ ${arrival.destination}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
-            Column(horizontalAlignment = Alignment.End) {
+            // 오류
+            if (errorMessage != null) {
+                Surface(shape = RoundedCornerShape(14.dp), color = c.dangerCtr, modifier = Modifier.fillMaxWidth()) {
+                    Text(errorMessage!!, modifier = Modifier.padding(12.dp), color = c.onDangerCtr, fontSize = 13.sp)
+                }
+            }
+
+            // 음성 안내 (TTS) — TODO(미구현): 실제 TTS 연동 전 표시용
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.primaryCtr).padding(horizontal = 16.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("🔊", fontSize = 21.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("음성 안내 켜짐", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.onPrimaryCtr)
+                    Text("10 · 5 · 3분 전 알림", fontSize = 12.5.sp, color = c.onPrimaryCtr.copy(alpha = 0.85f))
+                }
+            }
+
+            // 새로고침 행
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { viewModel.fetchArrivals() }.padding(8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("🔄 ", fontSize = 13.sp)
                 Text(
-                    text = arrival.arrivalMessage,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isUrgent) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurface
+                    text = if (isLoading) "갱신 중..." else "방금 갱신 · ${refreshCountdown}초 후 자동",
+                    fontSize = 12.5.sp, color = c.onVar
                 )
-                if (isUrgent) {
+            }
+        }
+
+        // ── 하단 액션 ────────────────────────────────────
+        Box(
+            modifier = Modifier.fillMaxWidth().background(c.appBg).navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 14.dp)
+        ) {
+            when {
+                missionState == MissionState.Active && remainingSeconds > 0 -> {
+                    Surface(
+                        onClick = { viewModel.onBoardingSuccess() },
+                        shape = RoundedCornerShape(18.dp),
+                        color = c.primary,
+                        modifier = Modifier.fillMaxWidth().height(60.dp)
+                    ) {
+                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                            Text("✅", fontSize = 24.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("탑승 완료", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = c.onPrimary)
+                        }
+                    }
+                }
+                missionState == MissionState.Active -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text("미션에 성공하셨나요?", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.on)
+                        Spacer(Modifier.height(10.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(onClick = { viewModel.onMissionFail() }, modifier = Modifier.weight(1f)) { Text("❌ 실패") }
+                            Button(onClick = { viewModel.onBoardingSuccess() }, modifier = Modifier.weight(1f)) { Text("✅ 성공") }
+                        }
+                    }
+                }
+                else -> {
                     Text(
-                        text = "⚡ 빨리!",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
+                        text = if (missionState == MissionState.Success) "🎉 오늘도 출근 성공! 잠시 후 돌아갑니다." else "😢 내일은 꼭 성공해요! 잠시 후 돌아갑니다.",
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        textAlign = TextAlign.Center, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.on
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ArrivalRow(arrival: TransitArrival, isLast: Boolean) {
+    val c = AppTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.clip(RoundedCornerShape(9.dp)).background(c.surface2).padding(horizontal = 11.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text("🚌", fontSize = 14.sp)
+            Text(arrival.routeName, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = c.on)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(arrival.destination, fontSize = 13.5.sp, color = c.on, maxLines = 1)
+            if (isLast) {
+                Spacer(Modifier.height(3.dp))
+                Row(
+                    modifier = Modifier.clip(RoundedCornerShape(7.dp)).background(c.amberCtr).padding(horizontal = 8.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text("⚡", fontSize = 11.sp)
+                    Text("막차 · 이 버스까지", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = c.onAmberCtr)
+                }
+            }
+        }
+        Text(
+            text = arrival.arrivalMessage,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (arrival.arrivalSeconds in 0..180) c.danger else c.on
+        )
+    }
+}
+
+private fun formatCountdown(remainingSeconds: Long): String {
+    val s = abs(remainingSeconds)
+    val h = s / 3600
+    val m = (s % 3600) / 60
+    val sec = s % 60
+    val body = if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
+    return if (remainingSeconds < 0) "-$body" else body
 }

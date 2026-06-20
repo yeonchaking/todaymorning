@@ -6,6 +6,31 @@
 
 ---
 
+## [2026-06-20] Claude Design v2 적용 — 게이미피케이션 폐기, 기능 위주 UI로 재설계
+
+**방향/목표:** 앱의 시각/UX를 "게임형(포인트·레벨·배지·스트릭)"에서 "실용·정보 중심"으로 전환. Claude Design으로 받은 v2 시안(정보 카드형·신호등·그룹 리스트)을 main의 Compose로 옮기되, 신규 기능은 이번엔 UI만 올리고 로직은 다음으로 분리.
+
+**결정 사항:**
+- **게이미피케이션 디자인은 폐기가 아니라 분기 보존** — 이유: 한 번 만든 작업을 버리지 않되 main 방향과 섞지 않기 위해. 게임형 리디자인 전체는 `feature/gamification` 브랜치(커밋 250303d)에 두고, main은 v2로 새로 감. (그 커밋에서 Theme.kt가 마운트 lock 문제로 잘려 커밋된 건 사용자가 재커밋으로 복구)
+- **시안 색을 M3 슬롯에 욱여넣지 않고 AppColors(CompositionLocal)로 분리** — 이유: 신호등(success/amber/danger)·surface 단계·outline-soft 등이 M3 기본 슬롯에 없음. 라이트/다크 토큰을 그대로 보존하려고 `LocalAppColors` 도입.
+- **신규 기능은 UI-first** — 이유: 사용자 선택. 알람 ON/OFF·요일반복·TTS·알람음·진동·지하철추가는 화면만 올리고 동작은 placeholder. 단 **막차 배지·신호등·이번 달 성공 수는 기존 데이터에서 실제 계산**해 진짜로 동작.
+- **달력에서 streak 헤더 제거(옵션화)** — 이유: 정보성 방향에 맞춰 "연속 성공 N일" 경쟁 표현을 빼고 월 기록+범례만. `showStreakHeader` 파라미터로 토글.
+
+**코드/프로젝트 변화:**
+- `ui/theme/AppColors.kt` 신규 + `Theme.kt` v2 색으로 갱신, `LocalAppColors` 제공.
+- `ui/MainActivity.kt`: 메인을 정보 카드형으로 전면 교체(상단바·알람 ON/OFF 스위치·오늘의 미션 카드·도착 CTA·이번 달 성공·달력·최근기록). `onStartTimeAttack` 추가.
+- `ui/timeattack/TimeAttackScreen.kt`: 신호등 히어로(잔여시간 기반 여유/곧출발/임박/지남)·실시간 도착+막차 배지·TTS 카드·새로고침으로 재작성. 기존 VM API 유지.
+- `ui/SettingsScreen.kt`: 그룹 리스트(알람/출근경로/음성안내)로 재작성. 시각 검증·저장·rememberSaveable 보존.
+- `ui/main/MissionCalendar.kt`: `showStreakHeader` 옵션 + 범례 추가. `MainViewModel`: `monthSuccessCount` 파생.
+- `NavGraph`: 메인 → 타임어택 연결.
+- (검증 한계) 사용자 실기기 빌드 통과 확인(`rememberSaveable` import 누락 1건 수정 후). 막차/신호등 정확도는 도착정보 파싱에 의존 — 실사용 점검은 다음.
+
+**[TODO 리스트 변경]:**
+- 해결: 없음 (방향 전환이라 기존 항목 닫힘보다 재정렬)
+- 추가: `TODO.md`에 신규 섹션 `0. v2 UI 미구현`(알람 ON/OFF 동작·요일반복·TTS·알람음·진동·홈 다음버스 미리보기) + 기능 "타임어택 신호등 정밀화". 방향 메모(게임 제외, v2)·"미사용 위치 권한 기능확정"으로 갱신. 완료된 "Git 리모트 연결" 제거.
+
+---
+
 ## [2026-06-17] 최근 기록 다중선택 삭제(편집) 기능 추가
 
 **방향/목표:** 홈화면 "최근 기록"을 읽기 전용에서 사용자가 잘못된 기록을 직접 정리할 수 있게 전환. 필드 인라인 수정이 아니라, 다중선택 후 일괄 삭제하는 편집 모드로 구현.

@@ -1,22 +1,27 @@
 package com.yeon.todaymorning.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.yeon.todaymorning.domain.model.UserSettings
+import com.yeon.todaymorning.ui.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,63 +29,52 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onPickHome: () -> Unit,
     onPickWork: () -> Unit,
-    onFindRoute: () -> Unit,          // Phase 2: 경로 탐색 화면
+    onFindRoute: () -> Unit,          // 출근 경로(버스 선택) 화면
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val savedSettings by viewModel.settings.collectAsState()
+    val c = AppTheme.colors
 
-    // rememberSaveable: 버스/위치 선택 화면으로 이동했다 돌아와도(설정 composable이 dispose됐다
-    // 재생성돼도) 편집 중인(아직 저장 전) 시각이 보존된다. 일반 remember는 화면 전환 시 소실됨.
-    //
-    // key는 저장된 "시각" 값. 버스/위치 부분 저장으로 savedSettings가 재emit돼도 시각 필드는
-    // 그대로이므로 key 불변 → 보존된 편집값 복원. 최초 DataStore 로딩·실제 시각 저장 때만 재초기화.
-    var alarmHour by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) {
-        mutableIntStateOf(savedSettings.alarmHour)
-    }
-    var alarmMinute by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) {
-        mutableIntStateOf(savedSettings.alarmMinute)
-    }
-    var targetHour by rememberSaveable(savedSettings.targetHour, savedSettings.targetMinute) {
-        mutableIntStateOf(savedSettings.targetHour)
-    }
-    var targetMinute by rememberSaveable(savedSettings.targetHour, savedSettings.targetMinute) {
-        mutableIntStateOf(savedSettings.targetMinute)
-    }
+    var alarmHour by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) { mutableIntStateOf(savedSettings.alarmHour) }
+    var alarmMinute by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) { mutableIntStateOf(savedSettings.alarmMinute) }
+    var targetHour by rememberSaveable(savedSettings.targetHour, savedSettings.targetMinute) { mutableIntStateOf(savedSettings.targetHour) }
+    var targetMinute by rememberSaveable(savedSettings.targetHour, savedSettings.targetMinute) { mutableIntStateOf(savedSettings.targetMinute) }
 
     var showAlarmPicker by remember { mutableStateOf(false) }
     var showTargetPicker by remember { mutableStateOf(false) }
 
-    var showSavedSnackbar by remember { mutableStateOf(false) }
+    // TODO(미구현): 아래 상태들은 화면 표시용 로컬 상태. 저장/동작 연결 필요.
+    var vibrate by rememberSaveable { mutableStateOf(true) }
+    var ttsOn by rememberSaveable { mutableStateOf(true) }
+    var tts10 by rememberSaveable { mutableStateOf(true) }
+    var tts5 by rememberSaveable { mutableStateOf(true) }
+    var tts3 by rememberSaveable { mutableStateOf(true) }
+
     var showTimeError by remember { mutableStateOf(false) }
+    var comingSoon by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(showTimeError) {
-        if (showTimeError) {
-            snackbarHostState.showSnackbar("알람 시각은 목표 탑승 시각보다 빨라야 해요")
-            showTimeError = false
-        }
+        if (showTimeError) { snackbarHostState.showSnackbar("알람 시각은 목표 탑승 시각보다 빨라야 해요"); showTimeError = false }
     }
-
-    LaunchedEffect(showSavedSnackbar) {
-        if (showSavedSnackbar) {
-            snackbarHostState.showSnackbar("설정이 저장되었습니다")
-            showSavedSnackbar = false
-        }
+    LaunchedEffect(comingSoon) {
+        if (comingSoon) { snackbarHostState.showSnackbar("준비 중인 기능이에요"); comingSoon = false }
     }
 
     Scaffold(
+        containerColor = c.appBg,
         topBar = {
             TopAppBar(
-                title = { Text("설정") },
+                title = { Text("설정", fontWeight = FontWeight.ExtraBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = c.surface,
+                    titleContentColor = c.on,
+                    navigationIconContentColor = c.on
                 )
             )
         },
@@ -91,251 +85,207 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // ── 알람 시각 ──────────────────────────────────────
-            SettingsSection(title = "알람 시각") {
-                TimeDisplayCard(
-                    hour = alarmHour,
-                    minute = alarmMinute,
-                    onClick = { showAlarmPicker = true }
-                )
+            // ── 알람 ──────────────────────────────────────
+            SettingsGroup("알람") {
+                NavRow("⏰", "알람 시각", "%02d:%02d".format(alarmHour, alarmMinute), valueStrong = true) { showAlarmPicker = true }
+                RowDivider()
+                NavRow("🚌", "목표 탑승 시각", "%02d:%02d".format(targetHour, targetMinute), valueStrong = true) { showTargetPicker = true }
+                RowDivider()
+                NavRow("🔁", "요일 반복", "평일") { comingSoon = true }     // TODO(미구현)
+                RowDivider()
+                NavRow("🎵", "알람음", "기본 알람음") { comingSoon = true }   // TODO(미구현)
+                RowDivider()
+                ToggleRow("📳", "진동", vibrate) { vibrate = it }          // TODO(미구현): 저장 연동
             }
 
-            // ── 목표 탑승 시각 ─────────────────────────────────
-            SettingsSection(title = "목표 탑승 시각") {
-                TimeDisplayCard(
-                    hour = targetHour,
-                    minute = targetMinute,
-                    onClick = { showTargetPicker = true }
-                )
-            }
-
-            // ── 집/회사 위치 (경로탐색 보류로 당장 불필요 — 추후 복구) ──────
-            /*
-            // ── 집 위치 ────────────────────────────────────────
-            SettingsSection(title = "집 위치") {
-                LocationCard(
-                    icon = "🏠",
-                    address = savedSettings.homeAddress,
-                    placeholder = "집 위치를 설정해 주세요",
-                    onEdit = onPickHome
-                )
-            }
-
-            // ── 회사 위치 ──────────────────────────────────────
-            SettingsSection(title = "회사 위치") {
-                LocationCard(
-                    icon = "🏢",
-                    address = savedSettings.workAddress,
-                    placeholder = "회사 위치를 설정해 주세요",
-                    onEdit = onPickWork
-                )
-            }
-            */
-
-            // ── 출근 버스 선택 + 미션 타겟 ─────────────────────────
-            SettingsSection(title = "출근 경로") {
-                if (savedSettings.hasMissionTarget) {
-                    // 미션 타겟 요약 카드
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = when (savedSettings.missionTransitType) {
-                                    com.yeon.todaymorning.domain.model.MissionTransitType.BUS -> "🚌 버스"
-                                    com.yeon.todaymorning.domain.model.MissionTransitType.SUBWAY -> "🚇 지하철"
-                                    else -> ""
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = savedSettings.missionRoutesLabel,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = savedSettings.missionStopName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+            // ── 출근 경로 ─────────────────────────────────
+            SettingsGroup("출근 경로") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(13.dp)
+                ) {
+                    SquareIcon("🚌", c.primaryCtr)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (savedSettings.hasMissionTarget) "${savedSettings.missionRoutesLabel} 번 버스" else "출근 경로 미설정",
+                            fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = c.on
+                        )
+                        Text(savedSettings.missionStopName.ifBlank { "정류장·노선을 선택하세요" }, fontSize = 12.5.sp, color = c.onVar)
                     }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = onFindRoute,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Place, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("출근 버스 다시 선택")
+                }
+                RowDivider()
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { comingSoon = true } // TODO(미구현): 지하철 직접선택 화면
+                        .padding(vertical = 14.dp, horizontal = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(13.dp)
+                ) {
+                    SquareIcon("🚇", c.surface2)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("지하철 추가", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = c.on)
+                        Text("역명 검색으로 노선 추가", fontSize = 12.5.sp, color = c.onVar)
                     }
-                } else {
-                    Button(
-                        onClick = onFindRoute,
-                        modifier = Modifier.fillMaxWidth()
+                    Text("＋", fontSize = 22.sp, color = c.primary)
+                }
+                RowDivider()
+                Box(modifier = Modifier.padding(vertical = 12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                            .border(1.5.dp, c.primary, RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onFindRoute() },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.Place, contentDescription = null)
+                        Text("⚙️", fontSize = 16.sp)
                         Spacer(Modifier.width(8.dp))
-                        Text("출근 버스 선택하기")
+                        Text("정류장 · 노선 다시 선택", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.primary)
                     }
                 }
             }
 
-            // ── 저장 ───────────────────────────────────────────
-            Button(
+            // ── 음성 안내 ─────────────────────────────────
+            SettingsGroup("음성 안내") {
+                ToggleRow("🔊", "음성 안내 (TTS)", ttsOn) { ttsOn = it }   // TODO(미구현): 실제 TTS 연동
+                RowDivider()
+                Column(modifier = Modifier.padding(vertical = 14.dp, horizontal = 2.dp)) {
+                    Text("안내 시점", fontSize = 13.sp, color = c.onVar)
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TimingChip("10분 전", tts10, Modifier.weight(1f)) { tts10 = !tts10 }
+                        TimingChip("5분 전", tts5, Modifier.weight(1f)) { tts5 = !tts5 }
+                        TimingChip("3분 전", tts3, Modifier.weight(1f)) { tts3 = !tts3 }
+                    }
+                }
+            }
+
+            // ── 저장 ───────────────────────────────────────
+            Surface(
                 onClick = {
                     val alarmTotal = alarmHour * 60 + alarmMinute
                     val targetTotal = targetHour * 60 + targetMinute
-                    if (alarmTotal >= targetTotal) {
-                        showTimeError = true
-                        return@Button
-                    }
+                    if (alarmTotal >= targetTotal) { showTimeError = true; return@Surface }
                     viewModel.saveSettings(
                         savedSettings.copy(
-                            alarmHour = alarmHour,
-                            alarmMinute = alarmMinute,
-                            targetHour = targetHour,
-                            targetMinute = targetMinute
+                            alarmHour = alarmHour, alarmMinute = alarmMinute,
+                            targetHour = targetHour, targetMinute = targetMinute
                         )
                     )
                     onNavigateBack()
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
+                shape = RoundedCornerShape(18.dp),
+                color = c.primary,
+                modifier = Modifier.fillMaxWidth().height(58.dp)
             ) {
-                Text("저장 및 알람 등록", style = MaterialTheme.typography.titleMedium)
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Text("🔔", fontSize = 19.sp)
+                    Spacer(Modifier.width(9.dp))
+                    Text("저장 및 알람 등록", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = c.onPrimary)
+                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
 
     if (showAlarmPicker) {
-        TimePickerDialog(
-            title = "알람 시각 선택",
-            initialHour = alarmHour,
-            initialMinute = alarmMinute,
-            onConfirm = { h, m ->
-                alarmHour = h
-                alarmMinute = m
-                showAlarmPicker = false
-            },
-            onDismiss = { showAlarmPicker = false }
-        )
+        TimePickerDialog("알람 시각 선택", alarmHour, alarmMinute,
+            onConfirm = { h, m -> alarmHour = h; alarmMinute = m; showAlarmPicker = false },
+            onDismiss = { showAlarmPicker = false })
     }
-
     if (showTargetPicker) {
-        TimePickerDialog(
-            title = "목표 탑승 시각 선택",
-            initialHour = targetHour,
-            initialMinute = targetMinute,
-            onConfirm = { h, m ->
-                targetHour = h
-                targetMinute = m
-                showTargetPicker = false
-            },
-            onDismiss = { showTargetPicker = false }
+        TimePickerDialog("목표 탑승 시각 선택", targetHour, targetMinute,
+            onConfirm = { h, m -> targetHour = h; targetMinute = m; showTargetPicker = false },
+            onDismiss = { showTargetPicker = false })
+    }
+}
+
+/* ─────────────────────────── 구성 요소 ─────────────────────────── */
+
+@Composable
+private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    val c = AppTheme.colors
+    Column {
+        Text(
+            text = title,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = c.primary,
+            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
+        )
+        Surface(shape = RoundedCornerShape(18.dp), color = c.surface, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp), content = content)
+        }
+    }
+}
+
+@Composable
+private fun NavRow(emoji: String, title: String, value: String, valueStrong: Boolean = false, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 14.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp)
+    ) {
+        Text(emoji, fontSize = 20.sp)
+        Text(title, fontSize = 15.sp, color = c.on, modifier = Modifier.weight(1f))
+        Text(
+            text = value,
+            fontSize = if (valueStrong) 16.sp else 14.sp,
+            fontWeight = if (valueStrong) FontWeight.ExtraBold else FontWeight.SemiBold,
+            color = if (valueStrong) c.primary else c.onVar
+        )
+        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = c.onVar)
+    }
+}
+
+@Composable
+private fun ToggleRow(emoji: String, title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp)
+    ) {
+        Text(emoji, fontSize = 20.sp)
+        Text(title, fontSize = 15.sp, color = c.on, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun SquareIcon(emoji: String, bg: Color) {
+    Box(modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(bg), contentAlignment = Alignment.Center) {
+        Text(emoji, fontSize = 18.sp)
+    }
+}
+
+@Composable
+private fun TimingChip(text: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (active) c.primaryCtr else c.surface2)
+            .clickable(onClick = onClick)
+            .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (active) c.onPrimaryCtr else c.onVar
         )
     }
 }
 
 @Composable
-private fun LocationCard(
-    icon: String,
-    address: String,
-    placeholder: String,
-    onEdit: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(text = icon, style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = address.ifBlank { placeholder },
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (address.isNotBlank()) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (address.isNotBlank()) FontWeight.Medium else FontWeight.Normal
-            )
-        }
-        IconButton(onClick = onEdit) {
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = "위치 변경",
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            content()
-        }
-    }
-}
-
-/** 탭하면 시계 다이얼로그를 여는 시각 표시 카드 */
-@Composable
-private fun TimeDisplayCard(
-    hour: Int,
-    minute: Int,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp, horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(text = "⏰", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = "%02d : %02d".format(hour, minute),
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
+private fun RowDivider() {
+    HorizontalDivider(color = AppTheme.colors.outlineSoft)
 }
 
 /** Material3 시계 TimePicker 다이얼로그 */
@@ -348,32 +298,12 @@ private fun TimePickerDialog(
     onConfirm: (Int, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val state = rememberTimePickerState(
-        initialHour = initialHour,
-        initialMinute = initialMinute,
-        is24Hour = true
-    )
-
+    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute, is24Hour = true)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                TimePicker(state = state)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
-                Text("확인")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소")
-            }
-        }
+        text = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TimePicker(state = state) } },
+        confirmButton = { TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("확인") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } }
     )
 }

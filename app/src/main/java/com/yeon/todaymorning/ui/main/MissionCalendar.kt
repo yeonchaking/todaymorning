@@ -1,6 +1,7 @@
 package com.yeon.todaymorning.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,7 +47,8 @@ import java.time.YearMonth
 fun MissionCalendar(
     streak: Int,
     records: List<MissionRecord>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showStreakHeader: Boolean = true
 ) {
     // date("yyyy-MM-dd") -> isSuccess. 같은 날 중복 시 성공 우선.
     val resultByDate = remember(records) {
@@ -64,26 +66,28 @@ fun MissionCalendar(
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
 
-            // 연속 성공 일수
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (streak >= 7) "🔥" else if (streak >= 3) "⭐" else "📅",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(Modifier.size(6.dp))
-                Text(
-                    text = "현재 ${streak}일 연속 성공",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            // 연속 성공 일수 (정보성 메인에선 생략)
+            if (showStreakHeader) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (streak >= 7) "🔥" else if (streak >= 3) "⭐" else "📅",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        text = "현재 ${streak}일 연속 성공",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
 
-            Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
+            }
 
             // 월 이동 헤더
             Row(
@@ -162,7 +166,42 @@ fun MissionCalendar(
                     }
                 }
             }
+
+            // 범례
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LegendDot(color = Color(0xFF4CAF50).copy(alpha = 0.5f), label = "성공")
+                LegendDot(color = MaterialTheme.colorScheme.error.copy(alpha = 0.45f), label = "실패")
+                LegendDot(color = Color.Transparent, label = "오늘", border = MaterialTheme.colorScheme.primary)
+            }
         }
+    }
+}
+
+@Composable
+private fun LegendDot(color: Color, label: String, border: Color? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(11.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(3.dp))
+                .background(color)
+                .then(
+                    if (border != null)
+                        Modifier.border(2.dp, border, androidx.compose.foundation.shape.RoundedCornerShape(3.dp))
+                    else Modifier
+                )
+        )
+        Spacer(Modifier.size(5.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

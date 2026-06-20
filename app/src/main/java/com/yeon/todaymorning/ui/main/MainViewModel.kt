@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.YearMonth
 import javax.inject.Inject
 
 data class MainUiState(
@@ -20,7 +21,9 @@ data class MainUiState(
     val recentRecords: List<MissionRecord> = emptyList(),
     val allRecords: List<MissionRecord> = emptyList(),
     val isEditMode: Boolean = false,
-    val selectedIds: Set<Long> = emptySet()
+    val selectedIds: Set<Long> = emptySet(),
+    /** 이번 달 출근 성공 횟수 (정보성 통계). */
+    val monthSuccessCount: Int = 0
 )
 
 @HiltViewModel
@@ -49,10 +52,15 @@ class MainViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(recentRecords = records)
             }
         }
-        // 달력용: 과거 전체 기록
+        // 달력용: 과거 전체 기록 + 이번 달 성공 횟수
         viewModelScope.launch {
             repository.getAllRecords().collect { records ->
-                _uiState.value = _uiState.value.copy(allRecords = records)
+                val ym = YearMonth.now().toString() // "2026-06"
+                val monthSuccess = records.count { it.isSuccess && it.date.startsWith(ym) }
+                _uiState.value = _uiState.value.copy(
+                    allRecords = records,
+                    monthSuccessCount = monthSuccess
+                )
             }
         }
     }

@@ -51,7 +51,8 @@ fun NavGraph(
     ) {
         composable(Routes.MAIN) {
             MainScreen(
-                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onStartTimeAttack = { navController.navigate(Routes.TIME_ATTACK) }
             )
         }
 
