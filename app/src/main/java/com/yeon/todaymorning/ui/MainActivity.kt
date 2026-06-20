@@ -35,12 +35,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
 import com.yeon.todaymorning.alarm.AlarmScheduler
 import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.domain.model.MissionTransitType
+import com.yeon.todaymorning.domain.model.TransitArrival
+import com.yeon.todaymorning.domain.model.TransitType
 import com.yeon.todaymorning.domain.model.UserSettings
 import com.yeon.todaymorning.ui.main.MainViewModel
 import com.yeon.todaymorning.ui.main.MissionCalendar
@@ -127,7 +130,16 @@ fun MainScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val arrivalDialog by viewModel.arrivalDialog.collectAsState()
     val c = AppTheme.colors
+
+    if (arrivalDialog.isOpen) {
+        ArrivalDialog(
+            state = arrivalDialog,
+            onRefresh = { viewModel.openArrivalDialog() },
+            onDismiss = { viewModel.closeArrivalDialog() }
+        )
+    }
 
     // 알람 ON/OFF는 DataStore의 alarmEnabled를 단일 출처로 사용. 토글 시 ViewModel이 저장+스케줄 반영.
     val alarmOn = settings.alarmEnabled
@@ -181,11 +193,11 @@ fun MainScreen(
             )
         }
 
-        // 실시간 도착 CTA (알람 켜졌고 미션 있을 때)
-        if (alarmOn && settings.hasMissionTarget) {
+        // 실시간 도착 CTA (미션 설정돼 있으면 알람 ON/OFF 무관하게 노출)
+        if (settings.hasMissionTarget) {
             item {
                 NextBusCta(
-                    onClick = onStartTimeAttack,
+                    onClick = { viewModel.openArrivalDialog() },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
@@ -472,6 +484,152 @@ private fun NextBusCta(onClick: () -> Unit, modifier: Modifier = Modifier) {
             modifier = Modifier.weight(1f)
         )
         Text("›", fontSize = 18.sp, color = c.onSuccessCtr)
+    }
+}
+
+/* ──────────────────── 실시간 도착정보 다이얼로그 ──────────────────── */
+
+@Composable
+private fun ArrivalDialog(
+    state: com.yeon.todaymorning.ui.main.ArrivalDialogState,
+    onRefresh: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val c = AppTheme.colors
+    // 여러 건일 때 현재 보고 있는 인덱스. 목록이 바뀌면 0으로.
+    var index by remember(state.arrivals) { mutableStateOf(0) }
+    val total = state.arrivals.size
+    val current = state.arrivals.getOrNull(index)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(24.dp), color = c.surface) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 헤더
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(c.success))
+                        Text("실시간 도착", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.on)
+                    }
+                    Text("✕", fontSize = 18.sp, color = c.onVar, modifier = Modifier.clickable(onClick = onDismiss))
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                when {
+                    state.isLoading -> {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 36.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                        }
+                    }
+                    current == null -> {
+                        Text(
+                            text = state.errorMessage ?: "도착 정보가 없습니다.",
+                            fontSize = 13.5.sp,
+                            color = c.onVar,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp)
+                        )
+                    }
+                    else -> {
+                        // ◀ [도착카드] ▶
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ArrowButton(
+                                symbol = "‹",
+                                enabled = index > 0,
+                                onClick = { if (index > 0) index-- }
+                            )
+                            ArrivalCardBody(arrival = current, modifier = Modifier.weight(1f))
+                            ArrowButton(
+                                symbol = "›",
+                                enabled = index < total - 1,
+                                onClick = { if (index < total - 1) index++ }
+                            )
+                        }
+
+                        if (total > 1) {
+                            Spacer(Modifier.height(14.dp))
+                            Text("${index + 1} / $total", fontSize = 13.sp, color = c.onVar, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    text = if (state.isLoading) "갱신 중..." else "🔄 새로고침",
+                    fontSize = 13.sp,
+                    color = c.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(enabled = !state.isLoading, onClick = onRefresh)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArrowButton(symbol: String, enabled: Boolean, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(c.surface2)
+            .alpha(if (enabled) 1f else 0.3f)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(symbol, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = c.on)
+    }
+}
+
+@Composable
+private fun ArrivalCardBody(arrival: TransitArrival, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    val icon = if (arrival.type == TransitType.SUBWAY) "🚇" else "🚌"
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(c.surface2)
+            .padding(vertical = 22.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(icon, fontSize = 22.sp)
+            Text(arrival.routeName, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = c.on)
+        }
+        if (arrival.destination.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                arrival.destination,
+                fontSize = 12.5.sp,
+                color = c.onVar,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = arrival.arrivalMessage,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (arrival.arrivalSeconds in 0..180) c.danger else c.primary
+        )
     }
 }
 

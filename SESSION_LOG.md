@@ -6,6 +6,28 @@
 
 ---
 
+## [2026-06-20] 홈 "실시간 도착 정보" 버튼 — 타임어택 이동 대신 다이얼로그 직접 조회로 전환
+
+**방향/목표:** 클로드 디자인이 임의로 넣은 홈 초록 CTA가 타임어택 화면으로 이동만 하던 것을, "메인에서 바로 다음차 도착 시간을 확인"하는 실용 기능으로 바꿈. v2 placeholder였던 "홈 다음버스 실시간 미리보기"를 닫는 작업.
+
+**결정 사항:**
+- **인라인 미리보기 대신 다이얼로그 on-demand 조회** — 이유: 홈에 상시 폴링을 붙이면 배터리/네트워크·생명주기 관리 비용이 큼. 버튼 누를 때만 1회 조회하는 다이얼로그가 "지금 도착정보 잘 들어오나 확인" 목적에 충분.
+- **버튼 노출 조건을 `alarmEnabled && hasMissionTarget` → `hasMissionTarget`만으로** — 이유: 도착정보 확인은 알람 ON/OFF와 무관한 행위. 미션(정류장+노선)이 설정돼 있으면 항상 보이고, 설정이 없으면 버튼 자체를 숨겨 오작동 오해 제거.
+- **조회 로직은 TimeAttackViewModel.fetchArrivals와 동일 방식 재사용** — 이유: DataStore 실제값 읽기 → 미션타입별 선택 노선 전부 합산 → 도착 빠른 순 정렬. 두 화면이 같은 규칙(아무거나 타면 성공)을 공유해야 일관됨.
+- **막차/첫차 반영은 이번 범위 밖 → TODO로 분리** — 이유: 노선별 운행시각 API 연동이 별도 작업. "운행 종료/운행 전" 안내 문구는 후속.
+
+**코드/프로젝트 변화:**
+- `ui/main/MainViewModel.kt`: `TransitRepository` 주입, `ArrivalDialogState`(open/loading/arrivals/error) + `openArrivalDialog()`/`closeArrivalDialog()` 추가.
+- `ui/MainActivity.kt`: `NextBusCta` 노출 조건을 `hasMissionTarget`로 변경, onClick을 다이얼로그 열기로 교체. `ArrivalDialog`/`ArrowButton`/`ArrivalCardBody` 컴포저블 신규 — 도착 1건 카드(노선/방면/N분 후, 버스🚌·지하철🚇), 여러 건은 ‹ › 화살표 + "n / m" 인디케이터, 로딩/빈/에러 처리, 새로고침. (`onStartTimeAttack` 파라미터는 미사용으로 남음 — 경고만.)
+- 빈 결과 안내 문구에서 "(운행 종료 또는 API 키 미설정)" 괄호 제거 → "도착 정보가 없습니다."
+- (검증 한계) 샌드박스에 Android SDK 없어 풀빌드 대신 색 토큰·import·기존 패턴 정적 확인. 실기기 빌드는 Android Studio에서.
+
+**[TODO 리스트 변경]:**
+- 해결: "홈 다음버스 실시간 미리보기"(섹션 0) — 다이얼로그 방식으로 닫음.
+- 추가: "막차/첫차 계산 → 실시간 도착정보 반영"(섹션 1 기능) — 운행 종료/전 안내.
+
+---
+
 ## [2026-06-20] 알람 ON/OFF·요일 반복 실동작 — 단일 게이트(applyAlarm)로 스케줄 통제
 
 **방향/목표:** v2에서 화면만 있고 동작 없던 placeholder 중 "알람 마스터 스위치"와 "요일 반복" 두 항목을, 두 플래그(`alarmEnabled` + `repeatDays`)를 하나의 조건으로 묶어 실제 알람/자동실패 스케줄 등록·취소까지 연결.

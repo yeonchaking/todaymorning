@@ -6,7 +6,11 @@ import com.yeon.todaymorning.alarm.AlarmScheduler
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.data.repository.MissionRepository
+import com.yeon.todaymorning.data.repository.TransitRepository
+import com.yeon.todaymorning.domain.model.MissionTransitType
+import com.yeon.todaymorning.domain.model.TransitArrival
 import com.yeon.todaymorning.domain.model.UserSettings
+import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,11 +31,20 @@ data class MainUiState(
     val monthSuccessCount: Int = 0
 )
 
+/** 실시간 도착정보 다이얼로그 상태. */
+data class ArrivalDialogState(
+    val isOpen: Boolean = false,
+    val isLoading: Boolean = false,
+    val arrivals: List<TransitArrival> = emptyList(),
+    val errorMessage: String? = null
+)
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: MissionRepository,
     private val dataStore: UserSettingsDataStore,
-    private val alarmScheduler: AlarmScheduler
+    private val alarmScheduler: AlarmScheduler,
+    private val transitRepository: TransitRepository
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> = dataStore.userSettings.stateIn(
@@ -42,6 +55,57 @@ class MainViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    // ── 실시간 도착정보 다이얼로그 ──────────────────────
+    private val _arrivalDialog = MutableStateFlow(ArrivalDialogState())
+    val arrivalDialog: StateFlow<ArrivalDialogState> = _arrivalDialog.asStateFlow()
+
+    /** 다이얼로그 열고 도착정보 조회. (TimeAttackViewModel.fetchArrivals 동일 로직) */
+    fun openArrivalDialog() {
+        _arrivalDialog.value = ArrivalDialogState(isOpen = true, isLoading = true)
+        viewModelScope.launch {
+            try {
+                val s = dataStore.userSettings.first()
+                if (!s.hasMissionTarget) {
+                    _arrivalDialog.value = ArrivalDialogState(
+                        isOpen = true,
+                        errorMessage = "설정된 미션이 없습니다."
+                    )
+                    return@launch
+                }
+
+                val results = mutableListOf<TransitArrival>()
+                when (s.missionTransitType) {
+                    MissionTransitType.BUS ->
+                        s.missionRoutes.forEach { route ->
+                            results += transitRepository.getBusArrivals(s.missionStopId, route.routeId)
+                        }
+                    MissionTransitType.SUBWAY ->
+                        s.missionRoutes.forEach { route ->
+                            results += transitRepository.getSubwayArrivals(s.missionStopId, route.routeId)
+                        }
+                    MissionTransitType.NONE -> Unit
+                }
+
+                val sorted = results.sortedBy { it.arrivalSeconds }
+                _arrivalDialog.value = ArrivalDialogState(
+                    isOpen = true,
+                    arrivals = sorted,
+                    errorMessage = if (sorted.isEmpty())
+                        "도착 정보가 없습니다." else null
+                )
+            } catch (e: Exception) {
+                _arrivalDialog.value = ArrivalDialogState(
+                    isOpen = true,
+                    errorMessage = "네트워크 오류: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun closeArrivalDialog() {
+        _arrivalDialog.value = ArrivalDialogState(isOpen = false)
+    }
 
     init {
         observeStats()
