@@ -28,10 +28,24 @@ class SettingsViewModel @Inject constructor(
     fun saveSettings(settings: UserSettings) {
         viewModelScope.launch {
             dataStore.saveSettings(settings)
-            // 다음 발생 시각 계산·등록은 AlarmScheduler가 담당.
-            // 실제 매일 반복은 AlarmReceiver/MissionFailReceiver가 발생 시점에 재등록.
-            alarmScheduler.scheduleDailyAlarm(settings.alarmHour, settings.alarmMinute)
-            alarmScheduler.scheduleDailyMissionFail(settings.targetHour, settings.targetMinute)
+            // 활성화·반복 요일을 반영해 등록/취소. 실제 반복은 Receiver가 발생 시점에 재등록.
+            alarmScheduler.applyAlarm(settings)
+        }
+    }
+
+    /** 마스터 스위치 토글: 부분 저장 후 즉시 등록/취소 반영. */
+    fun setAlarmEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStore.saveAlarmEnabled(enabled)
+            alarmScheduler.applyAlarm(settings.value.copy(alarmEnabled = enabled))
+        }
+    }
+
+    /** 반복 요일 저장 후 즉시 등록/취소 반영. */
+    fun setRepeatDays(days: Set<Int>) {
+        viewModelScope.launch {
+            dataStore.saveRepeatDays(days)
+            alarmScheduler.applyAlarm(settings.value.copy(repeatDays = days))
         }
     }
 

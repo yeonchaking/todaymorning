@@ -3,6 +3,7 @@ package com.yeon.todaymorning.data.datastore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -13,6 +14,7 @@ import com.google.gson.reflect.TypeToken
 import com.yeon.todaymorning.domain.model.MissionRoute
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.UserSettings
+import com.yeon.todaymorning.domain.model.WEEKDAYS
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -28,6 +30,13 @@ class UserSettingsDataStore(private val context: Context) {
         val ALARM_MINUTE = intPreferencesKey("alarm_minute")
         val TARGET_HOUR = intPreferencesKey("target_hour")
         val TARGET_MINUTE = intPreferencesKey("target_minute")
+
+        val ALARM_ENABLED = booleanPreferencesKey("alarm_enabled")
+        val REPEAT_DAYS = intPreferencesKey("repeat_days")  // Calendar 요일 비트마스크
+
+        /** 요일 집합 ↔ 비트마스크 (bit n = Calendar 요일값 n, 일=1 … 토=7). */
+        fun encodeDays(days: Set<Int>): Int = days.fold(0) { acc, d -> acc or (1 shl d) }
+        fun decodeDays(mask: Int): Set<Int> = (1..7).filter { (mask shr it) and 1 == 1 }.toSet()
 
         val HOME_LAT = doublePreferencesKey("home_lat")
         val HOME_LNG = doublePreferencesKey("home_lng")
@@ -49,6 +58,9 @@ class UserSettingsDataStore(private val context: Context) {
             alarmMinute = prefs[ALARM_MINUTE] ?: 0,
             targetHour = prefs[TARGET_HOUR] ?: 9,
             targetMinute = prefs[TARGET_MINUTE] ?: 0,
+            alarmEnabled = prefs[ALARM_ENABLED] ?: true,
+            // 키가 아예 없으면 평일 기본값. 사용자가 '반복 없음'(mask 0)으로 저장한 경우는 그대로 빈 집합 유지.
+            repeatDays = prefs[REPEAT_DAYS]?.let { decodeDays(it) } ?: WEEKDAYS,
             homeLat = prefs[HOME_LAT] ?: 0.0,
             homeLng = prefs[HOME_LNG] ?: 0.0,
             homeAddress = prefs[HOME_ADDRESS] ?: "",
@@ -72,6 +84,8 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[ALARM_MINUTE] = settings.alarmMinute
             prefs[TARGET_HOUR] = settings.targetHour
             prefs[TARGET_MINUTE] = settings.targetMinute
+            prefs[ALARM_ENABLED] = settings.alarmEnabled
+            prefs[REPEAT_DAYS] = encodeDays(settings.repeatDays)
             prefs[HOME_LAT] = settings.homeLat
             prefs[HOME_LNG] = settings.homeLng
             prefs[HOME_ADDRESS] = settings.homeAddress
@@ -101,6 +115,20 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[MISSION_STOP_ID] = stopId
             prefs[MISSION_STOP_NAME] = stopName
             prefs[MISSION_ROUTES] = gson.toJson(routes)
+        }
+    }
+
+    /** 마스터 스위치만 부분 저장 (시각·요일 키 미변경). */
+    suspend fun saveAlarmEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[ALARM_ENABLED] = enabled
+        }
+    }
+
+    /** 반복 요일만 부분 저장 (시각·활성화 키 미변경). */
+    suspend fun saveRepeatDays(days: Set<Int>) {
+        context.dataStore.edit { prefs ->
+            prefs[REPEAT_DAYS] = encodeDays(days)
         }
     }
 

@@ -21,6 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.yeon.todaymorning.domain.model.EVERYDAY
+import com.yeon.todaymorning.domain.model.WEEKDAYS
+import com.yeon.todaymorning.domain.model.WEEKEND
 import com.yeon.todaymorning.ui.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +52,8 @@ fun SettingsScreen(
     var tts10 by rememberSaveable { mutableStateOf(true) }
     var tts5 by rememberSaveable { mutableStateOf(true) }
     var tts3 by rememberSaveable { mutableStateOf(true) }
+
+    var showRepeatDialog by remember { mutableStateOf(false) }
 
     var showTimeError by remember { mutableStateOf(false) }
     var comingSoon by remember { mutableStateOf(false) }
@@ -94,7 +99,7 @@ fun SettingsScreen(
                 RowDivider()
                 NavRow("🚌", "목표 탑승 시각", "%02d:%02d".format(targetHour, targetMinute), valueStrong = true) { showTargetPicker = true }
                 RowDivider()
-                NavRow("🔁", "요일 반복", "평일") { comingSoon = true }     // TODO(미구현)
+                NavRow("🔁", "요일 반복", savedSettings.repeatDaysLabel) { showRepeatDialog = true }
                 RowDivider()
                 NavRow("🎵", "알람음", "기본 알람음") { comingSoon = true }   // TODO(미구현)
                 RowDivider()
@@ -200,6 +205,101 @@ fun SettingsScreen(
         TimePickerDialog("목표 탑승 시각 선택", targetHour, targetMinute,
             onConfirm = { h, m -> targetHour = h; targetMinute = m; showTargetPicker = false },
             onDismiss = { showTargetPicker = false })
+    }
+    if (showRepeatDialog) {
+        RepeatDaysDialog(
+            initial = savedSettings.repeatDays,
+            onConfirm = { days -> viewModel.setRepeatDays(days); showRepeatDialog = false },
+            onDismiss = { showRepeatDialog = false }
+        )
+    }
+}
+
+/* ─────────────────────── 요일 반복 선택 다이얼로그 ─────────────────────── */
+
+@Composable
+private fun RepeatDaysDialog(
+    initial: Set<Int>,
+    onConfirm: (Set<Int>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val c = AppTheme.colors
+    var selected by remember { mutableStateOf(initial) }
+
+    // 표시 순서: 월~일. 각 칩 = (라벨, Calendar 요일값)
+    val days = listOf(
+        "월" to java.util.Calendar.MONDAY,
+        "화" to java.util.Calendar.TUESDAY,
+        "수" to java.util.Calendar.WEDNESDAY,
+        "목" to java.util.Calendar.THURSDAY,
+        "금" to java.util.Calendar.FRIDAY,
+        "토" to java.util.Calendar.SATURDAY,
+        "일" to java.util.Calendar.SUNDAY
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selected) }) { Text("확인", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소") }
+        },
+        title = { Text("요일 반복", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column {
+                // 프리셋 빠른 선택
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PresetChip("평일", Modifier.weight(1f)) { selected = WEEKDAYS }
+                    PresetChip("매일", Modifier.weight(1f)) { selected = EVERYDAY }
+                    PresetChip("주말", Modifier.weight(1f)) { selected = WEEKEND }
+                }
+                Spacer(Modifier.height(14.dp))
+                // 개별 요일 토글
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    days.forEach { (label, cal) ->
+                        val active = cal in selected
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (active) c.primary else c.surface2)
+                                .clickable {
+                                    selected = if (active) selected - cal else selected + cal
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 14.sp,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                                color = if (active) c.onPrimary else c.onVar
+                            )
+                        }
+                    }
+                }
+                if (selected.isEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text("요일을 선택하지 않으면 알람이 울리지 않아요", fontSize = 12.sp, color = c.onVar)
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun PresetChip(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, c.primary, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.primary)
     }
 }
 

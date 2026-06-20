@@ -34,8 +34,12 @@ class AlarmReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val settings = UserSettingsDataStore(context).userSettings.first()
-                AlarmScheduler(context)
-                    .scheduleDailyAlarm(settings.alarmHour, settings.alarmMinute)
+                // 마스터 스위치 OFF 또는 반복 요일 없음이면 다음 발생을 재등록하지 않는다.
+                if (settings.alarmActive) {
+                    AlarmScheduler(context).scheduleDailyAlarm(
+                        settings.alarmHour, settings.alarmMinute, settings.repeatDays
+                    )
+                }
             } finally {
                 pending.finish()
             }
@@ -47,9 +51,8 @@ class AlarmReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val settings = UserSettingsDataStore(context).userSettings.first()
-                val scheduler = AlarmScheduler(context)
-                scheduler.scheduleDailyAlarm(settings.alarmHour, settings.alarmMinute)
-                scheduler.scheduleDailyMissionFail(settings.targetHour, settings.targetMinute)
+                // 활성화·요일·취소를 한 번에 반영 (OFF면 내부에서 취소 처리).
+                AlarmScheduler(context).applyAlarm(settings)
             } finally {
                 pending.finish()
             }

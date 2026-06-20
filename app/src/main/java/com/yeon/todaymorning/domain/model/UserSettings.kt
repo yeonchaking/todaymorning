@@ -10,11 +10,29 @@ data class MissionRoute(
     val direction: String     // 방면
 )
 
+/**
+ * 요일 표현은 java.util.Calendar 상수를 그대로 쓴다 (일=1 … 토=7).
+ * 기본값은 평일(월~금).
+ */
+val WEEKDAYS: Set<Int> = setOf(
+    java.util.Calendar.MONDAY,
+    java.util.Calendar.TUESDAY,
+    java.util.Calendar.WEDNESDAY,
+    java.util.Calendar.THURSDAY,
+    java.util.Calendar.FRIDAY
+)
+val EVERYDAY: Set<Int> = (java.util.Calendar.SUNDAY..java.util.Calendar.SATURDAY).toSet()
+val WEEKEND: Set<Int> = setOf(java.util.Calendar.SATURDAY, java.util.Calendar.SUNDAY)
+
 data class UserSettings(
     val alarmHour: Int = 7,
     val alarmMinute: Int = 0,
     val targetHour: Int = 9,
     val targetMinute: Int = 0,
+
+    // ── 알람 활성화 / 반복 요일 ──────────────────────
+    val alarmEnabled: Boolean = true,
+    val repeatDays: Set<Int> = WEEKDAYS,   // Calendar 요일값 집합. 빈 집합 = 반복 없음
 
     // ── 집 위치 ───────────────────────────────────────
     val homeLat: Double = 0.0,
@@ -41,4 +59,28 @@ data class UserSettings(
 
     /** 요약 표시용: "651, 388" */
     val missionRoutesLabel: String get() = missionRoutes.joinToString(", ") { it.routeName }
+
+    /** 알람이 실제로 동작해야 하는가 — 마스터 스위치 ON 이고 반복 요일이 하나라도 있어야 한다. */
+    val alarmActive: Boolean get() = alarmEnabled && repeatDays.isNotEmpty()
+
+    /** 요약 표시용: "평일" / "매일" / "주말" / "월·수·금" / "반복 없음" */
+    val repeatDaysLabel: String
+        get() = when (repeatDays) {
+            WEEKDAYS -> "평일"
+            EVERYDAY -> "매일"
+            WEEKEND -> "주말"
+            emptySet<Int>() -> "반복 없음"
+            else -> {
+                val order = listOf(
+                    java.util.Calendar.MONDAY to "월",
+                    java.util.Calendar.TUESDAY to "화",
+                    java.util.Calendar.WEDNESDAY to "수",
+                    java.util.Calendar.THURSDAY to "목",
+                    java.util.Calendar.FRIDAY to "금",
+                    java.util.Calendar.SATURDAY to "토",
+                    java.util.Calendar.SUNDAY to "일"
+                )
+                order.filter { it.first in repeatDays }.joinToString("·") { it.second }
+            }
+        }
 }

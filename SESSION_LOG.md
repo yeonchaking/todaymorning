@@ -6,6 +6,33 @@
 
 ---
 
+## [2026-06-20] 알람 ON/OFF·요일 반복 실동작 — 단일 게이트(applyAlarm)로 스케줄 통제
+
+**방향/목표:** v2에서 화면만 있고 동작 없던 placeholder 중 "알람 마스터 스위치"와 "요일 반복" 두 항목을, 두 플래그(`alarmEnabled` + `repeatDays`)를 하나의 조건으로 묶어 실제 알람/자동실패 스케줄 등록·취소까지 연결.
+
+**결정 사항:**
+- **요일 게이팅을 런타임 차단이 아니라 "다음 발생 시각 계산"으로 처리** — 이유: 알람은 `setAlarmClock` 1회성이고 매일 반복을 Receiver 재등록으로 흉내내므로, "울린 뒤 꺼진 요일이면 무시"하면 알람음이 한 번 울리는 걸 못 막는다. `nextDailyTrigger(h,m,repeatDays)`가 꺼진 요일을 건너뛴 첫 시각을 반환(없으면 null).
+- **활성/요일/취소를 한 진입점 `AlarmScheduler.applyAlarm(settings)`로 통합** — 이유: ON/OFF·요일·시각 변경이 여러 곳(설정 저장, 메인 스위치, 부팅 복원)에서 일어나므로 게이트 로직 분산을 막음. `alarmActive = alarmEnabled && repeatDays.isNotEmpty()` 한 줄로 판정, false면 알람+자동실패 모두 cancel.
+- **요일 저장은 비트마스크 Int** — 이유: Set<Int>(Calendar 요일값)을 DataStore에 단순/가역 저장. 키 없으면 평일 기본, mask 0(반복 없음)은 그대로 보존(기본값으로 되돌리지 않음).
+- **마스터 스위치 단일 출처를 DataStore로** — 이유: 기존 메인 로컬 `rememberSaveable` 상태라 재시작·재진입 시 실제 스케줄과 불일치. `settings.alarmEnabled`에 바인딩.
+- **요일 UI는 프리셋+개별** — 이유: 사용자 선택. 평일/매일/주말 빠른 버튼 + 월~일 7칩 토글.
+
+**코드/프로젝트 변화:**
+- `domain/model/UserSettings.kt`: `alarmEnabled`·`repeatDays`(기본 평일) 필드 + `alarmActive`·`repeatDaysLabel` 파생, `WEEKDAYS`/`EVERYDAY`/`WEEKEND` 상수.
+- `data/datastore/UserSettingsDataStore.kt`: `ALARM_ENABLED`·`REPEAT_DAYS` 키, `encodeDays`/`decodeDays`, `saveAlarmEnabled`·`saveRepeatDays` 부분저장.
+- `alarm/AlarmScheduler.kt`: 요일 인식 `nextDailyTrigger` 오버로드 + `applyAlarm` 게이트, `scheduleDailyAlarm`/`scheduleDailyMissionFail`이 `repeatDays` 인자로 변경(2-arg 제거).
+- `alarm/AlarmReceiver.kt`·`MissionFailReceiver.kt`: 재등록을 `alarmActive`일 때만, 요일 반영. 부팅 복원은 `applyAlarm`로 일원화.
+- `ui/SettingsViewModel.kt`·`ui/main/MainViewModel.kt`: `setAlarmEnabled`/`setRepeatDays` 추가, `MainViewModel`에 `AlarmScheduler` 주입. 저장 경로가 `applyAlarm` 호출.
+- `ui/MainActivity.kt`: 마스터 스위치를 `settings.alarmEnabled`에 바인딩(로컬상태 제거), 미션카드 요일점·스위치 부제를 `repeatDays`로 구동.
+- `ui/SettingsScreen.kt`: "요일 반복" 행 → `RepeatDaysDialog`(프리셋+7칩), 라벨은 `repeatDaysLabel`.
+- (검증 한계) kotlinc/Android SDK 없어 풀빌드 대신 요일 스킵·비트마스크 왕복·프리셋·빈집합→미등록·오늘포함을 동치 파이썬 로직으로 통과. 실기기 빌드·동작은 Android Studio에서.
+
+**[TODO 리스트 변경]:**
+- 해결: `0. v2 UI 미구현`의 "알람 ON/OFF 마스터 스위치 실제 동작", "요일 반복 설정 + 스케줄 반영"
+- 추가: 없음
+
+---
+
 ## [2026-06-20] Claude Design v2 적용 — 게이미피케이션 폐기, 기능 위주 UI로 재설계
 
 **방향/목표:** 앱의 시각/UX를 "게임형(포인트·레벨·배지·스트릭)"에서 "실용·정보 중심"으로 전환. Claude Design으로 받은 v2 시안(정보 카드형·신호등·그룹 리스트)을 main의 Compose로 옮기되, 신규 기능은 이번엔 UI만 올리고 로직은 다음으로 분리.

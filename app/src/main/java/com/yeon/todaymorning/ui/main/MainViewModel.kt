@@ -2,6 +2,7 @@ package com.yeon.todaymorning.ui.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yeon.todaymorning.alarm.AlarmScheduler
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.data.repository.MissionRepository
@@ -29,7 +30,8 @@ data class MainUiState(
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: MissionRepository,
-    private val dataStore: UserSettingsDataStore
+    private val dataStore: UserSettingsDataStore,
+    private val alarmScheduler: AlarmScheduler
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> = dataStore.userSettings.stateIn(
@@ -44,6 +46,14 @@ class MainViewModel @Inject constructor(
     init {
         observeStats()
         refreshStreak()
+    }
+
+    /** 메인 마스터 스위치: 부분 저장 후 등록/취소를 즉시 반영. */
+    fun setAlarmEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStore.saveAlarmEnabled(enabled)
+            alarmScheduler.applyAlarm(settings.value.copy(alarmEnabled = enabled))
+        }
     }
 
     private fun observeStats() {

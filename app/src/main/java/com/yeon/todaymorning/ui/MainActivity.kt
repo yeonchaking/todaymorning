@@ -129,8 +129,8 @@ fun MainScreen(
     val settings by viewModel.settings.collectAsState()
     val c = AppTheme.colors
 
-    // TODO(미구현): 알람 ON/OFF는 현재 화면 로컬 상태. DataStore 저장 + 실제 스케줄 해제/등록 연동 필요.
-    var alarmOn by rememberSaveable { mutableStateOf(true) }
+    // 알람 ON/OFF는 DataStore의 alarmEnabled를 단일 출처로 사용. 토글 시 ViewModel이 저장+스케줄 반영.
+    val alarmOn = settings.alarmEnabled
 
     LazyColumn(
         modifier = Modifier
@@ -166,7 +166,7 @@ fun MainScreen(
         item {
             MasterSwitchCard(
                 alarmOn = alarmOn,
-                onToggle = { alarmOn = it },
+                onToggle = { viewModel.setAlarmEnabled(it) },
                 settings = settings,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
@@ -320,7 +320,7 @@ private fun MasterSwitchCard(
                 Text("출근 알람", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = c.on)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(
-                        text = if (alarmOn) "내일 $alarmText · 평일 반복" else "알람 꺼짐",
+                        text = if (alarmOn) "다음 $alarmText · ${settings.repeatDaysLabel} 반복" else "알람 꺼짐",
                         fontSize = 13.sp,
                         color = c.onVar
                     )
@@ -414,12 +414,20 @@ private fun MissionCardV2(
         }
 
         Spacer(Modifier.height(12.dp))
-        // 반복 요일 (현재는 평일 고정 표시 — TODO: 실제 요일 설정 연동)
+        // 반복 요일 — 설정의 repeatDays를 단일 출처로 표시.
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Text("반복", fontSize = 12.sp, color = c.onVar)
-            val days = listOf("월", "화", "수", "목", "금", "토", "일")
-            days.forEachIndexed { idx, d ->
-                val active = idx <= 4 // 평일
+            val days = listOf(
+                "월" to java.util.Calendar.MONDAY,
+                "화" to java.util.Calendar.TUESDAY,
+                "수" to java.util.Calendar.WEDNESDAY,
+                "목" to java.util.Calendar.THURSDAY,
+                "금" to java.util.Calendar.FRIDAY,
+                "토" to java.util.Calendar.SATURDAY,
+                "일" to java.util.Calendar.SUNDAY
+            )
+            days.forEach { (d, cal) ->
+                val active = cal in settings.repeatDays
                 Box(
                     modifier = Modifier
                         .size(26.dp)
