@@ -56,6 +56,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** 진동 패턴 선택만 부분 저장. 알람 재등록 불필요(서비스가 울릴 때 읽음). */
+    fun setVibrationPattern(patternId: String) {
+        viewModelScope.launch {
+            dataStore.saveVibrationPattern(patternId)
+        }
+    }
+
     /** 휴대폰에서 고른 알람음 → 선택 + "최근 선택한 알람"으로 동시 저장. */
     fun setPickedRingtone(uri: String) {
         viewModelScope.launch {

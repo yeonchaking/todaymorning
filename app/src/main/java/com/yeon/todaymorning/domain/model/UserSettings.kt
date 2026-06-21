@@ -42,6 +42,11 @@ data class UserSettings(
     // "최근 선택한 알람"으로 다이얼로그에 계속 표시하기 위해 별도 보관. "" = 고른 적 없음.
     val lastPickedSoundId: String = "",
 
+    // ── 진동 패턴 선택 ────────────────────────────────
+    // VibrationPatterns.PATTERNS 의 id 중 하나. "off" = 진동 없음, 기본값 "basic"(1초 패턴).
+    // (규칙·해석은 com.yeon.todaymorning.alarm.VibrationPatterns)
+    val vibrationPatternId: String = "basic",
+
     // ── 집 위치 ───────────────────────────────────────
     val homeLat: Double = 0.0,
     val homeLng: Double = 0.0,

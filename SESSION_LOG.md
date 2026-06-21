@@ -6,6 +6,29 @@
 
 ---
 
+## [2026-06-21] 진동을 on/off 토글 → 패턴 선택 방식으로 전환
+
+**방향/목표:** v2 placeholder였던 설정 "진동" 토글(rememberSaveable 로컬 상태일 뿐 저장 안 됨)을 실제 동작으로 닫음. 동시에 단순 on/off 대신 사용자가 진동 세기/리듬을 고를 수 있게 "패턴 선택" UX로 확장. 직전 세션의 알람음 선택과 **같은 구조를 그대로 재사용**해 일관성 확보.
+
+**결정 사항:**
+- **on/off 토글이 아니라 패턴 선택 다이얼로그로 설계** — 이유: 사용자 요청. 진동 없음/짧게/기본/길게/두 번씩 등 여러 리듬을 제공하고, 탭하면 그 진동을 실제로 느껴본 뒤 확인으로 확정하는 게 "진동을 끄거나 켜는" 것보다 실용적. OFF도 패턴의 한 항목으로 흡수(별도 boolean 불필요).
+- **vibrationPatternId 단일 문자열 + VibrationPatterns registry** — 이유: 알람음(`alarmSoundId`/`AlarmSounds`)과 완전히 동일한 패턴. 패턴 추가는 `VibrationPatterns.PATTERNS`에 한 줄이면 다이얼로그에 자동 노출, 다른 코드 수정 불필요. 해석(waveform 변환·OFF 판정·라벨)을 한 곳에 모음. 기본값 `"basic"`(1초 패턴)이라 기존 사용자 동작 불변.
+- **서비스가 울릴 때 DataStore를 직접 읽음** (Hilt 미적용 → `runBlocking.first()`) — 이유: 알람음과 동일. 진동 패턴 변경 시 알람 재등록 불필요, "울리는 순간"에만 필요하므로 그 시점에 읽음.
+- **확인 버튼에서만 commit (다이얼로그는 임시 선택값 보유)** — 이유: 알람음은 탭 즉시 저장이지만, 진동은 탭=미리보기·확인=저장으로 분리. 여러 패턴을 느껴보다 취소하면 원래 값 유지되는 게 자연스러움. 요일반복 다이얼로그와 같은 commit 방식.
+
+**코드/프로젝트 변화:**
+- `alarm/VibrationPatterns.kt` 신규 — `PatternDef(id,label,waveform)` 목록 + `waveformOf`/`isOff`/`label`. (off/short 0.5s/basic 1s/long 5s/double)
+- `UserSettings`에 `vibrationPatternId="basic"` 추가. `UserSettingsDataStore`에 `VIBRATION_PATTERN_ID` 키 + 읽기/saveSettings + `saveVibrationPattern` 부분저장. `SettingsViewModel.setVibrationPattern`.
+- `AlarmRingService.startVibration` — 하드코딩 `longArrayOf(0,1000,1000)` 제거, 저장된 패턴 읽어 재생. OFF면 진동 시작 안 함(early return).
+- `SettingsScreen` — `ToggleRow("진동")` + 죽은 `vibrate` 로컬 상태 제거 → `NavRow`(현재 패턴 라벨) + `VibrationPatternDialog`(탭 시 Vibrator로 미리보기 반복, 닫힐 때 cancel, 확인 시 저장). `SoundRow` 재사용.
+- 빌드 함정: `SettingsScreen`에 `android.content.Context` import 누락으로 실기기 빌드 실패 → 추가로 해결. (샌드박스 빌드는 캐시 때문에 못 잡음 — 검증 시 `--rerun-tasks` 필요했음.)
+
+**[TODO 리스트 변경]:**
+- 해결: [0] "진동 on/off 저장·제어" (패턴 선택 방식으로 구현 완료)
+- 추가: 없음
+
+---
+
 ## [2026-06-21] 알람음 선택 기능 — 시스템 음원 선택 + 내장음원 확장 구조
 
 **방향/목표:** v2 placeholder였던 설정 "알람음" 행(누르면 "준비 중" 스낵바만)을 실제 동작으로 닫음. 알람음이 폰 시스템 기본음 고정이라 기종마다 달랐던 문제를 사용자가 직접 고를 수 있게 전환. "지금은 음원을 새로 만들지 않고, 폰 음원 선택 + 내장음원을 나중에 쉽게 추가할 수 있는 구조만 준비"로 범위 합의.

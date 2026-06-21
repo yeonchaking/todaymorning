@@ -111,6 +111,14 @@ class AlarmRingService : Service() {
     }.getOrDefault(false)
 
     private fun startVibration() {
+        // 사용자가 고른 진동 패턴 id 를 읽는다(서비스는 Hilt 미적용 → DataStore 직접 생성).
+        val patternId = runCatching {
+            runBlocking { UserSettingsDataStore(applicationContext).userSettings.first().vibrationPatternId }
+        }.getOrDefault(VibrationPatterns.DEFAULT_ID)
+
+        // OFF 면 진동 자체를 시작하지 않는다.
+        val pattern = VibrationPatterns.waveformOf(patternId) ?: return
+
         val vib = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
         } else {
@@ -118,8 +126,7 @@ class AlarmRingService : Service() {
             getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         }
         vibrator = vib
-        // 1초 진동 / 1초 멈춤 반복
-        val pattern = longArrayOf(0, 1000, 1000)
+        // 선택한 패턴을 무한 반복(repeat index 0) 재생
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vib.vibrate(VibrationEffect.createWaveform(pattern, 0))
         } else {

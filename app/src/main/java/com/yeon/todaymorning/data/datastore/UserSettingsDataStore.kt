@@ -35,6 +35,7 @@ class UserSettingsDataStore(private val context: Context) {
         val REPEAT_DAYS = intPreferencesKey("repeat_days")  // Calendar 요일 비트마스크
         val ALARM_SOUND_ID = stringPreferencesKey("alarm_sound_id")  // "" | "builtin:<key>" | content:// URI
         val LAST_PICKED_SOUND_ID = stringPreferencesKey("last_picked_sound_id")  // 마지막으로 고른 시스템 알람음 URI
+        val VIBRATION_PATTERN_ID = stringPreferencesKey("vibration_pattern_id")  // VibrationPatterns id ("off" | "basic" | ...)
 
         /** 요일 집합 ↔ 비트마스크 (bit n = Calendar 요일값 n, 일=1 … 토=7). */
         fun encodeDays(days: Set<Int>): Int = days.fold(0) { acc, d -> acc or (1 shl d) }
@@ -65,6 +66,7 @@ class UserSettingsDataStore(private val context: Context) {
             repeatDays = prefs[REPEAT_DAYS]?.let { decodeDays(it) } ?: WEEKDAYS,
             alarmSoundId = prefs[ALARM_SOUND_ID] ?: "",
             lastPickedSoundId = prefs[LAST_PICKED_SOUND_ID] ?: "",
+            vibrationPatternId = prefs[VIBRATION_PATTERN_ID] ?: "basic",
             homeLat = prefs[HOME_LAT] ?: 0.0,
             homeLng = prefs[HOME_LNG] ?: 0.0,
             homeAddress = prefs[HOME_ADDRESS] ?: "",
@@ -92,6 +94,7 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[REPEAT_DAYS] = encodeDays(settings.repeatDays)
             prefs[ALARM_SOUND_ID] = settings.alarmSoundId
             prefs[LAST_PICKED_SOUND_ID] = settings.lastPickedSoundId
+            prefs[VIBRATION_PATTERN_ID] = settings.vibrationPatternId
             prefs[HOME_LAT] = settings.homeLat
             prefs[HOME_LNG] = settings.homeLng
             prefs[HOME_ADDRESS] = settings.homeAddress
@@ -142,6 +145,13 @@ class UserSettingsDataStore(private val context: Context) {
     suspend fun saveAlarmSound(soundId: String) {
         context.dataStore.edit { prefs ->
             prefs[ALARM_SOUND_ID] = soundId
+        }
+    }
+
+    /** 진동 패턴 선택만 부분 저장 (시각·알람 미변경). 알람 재등록 불필요(서비스가 울릴 때 읽음). */
+    suspend fun saveVibrationPattern(patternId: String) {
+        context.dataStore.edit { prefs ->
+            prefs[VIBRATION_PATTERN_ID] = patternId
         }
     }
 

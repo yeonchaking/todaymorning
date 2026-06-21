@@ -1,12 +1,17 @@
 package com.yeon.todaymorning.ui
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.res.AssetFileDescriptor
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -35,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yeon.todaymorning.alarm.AlarmSounds
+import com.yeon.todaymorning.alarm.VibrationPatterns
 import com.yeon.todaymorning.domain.model.EVERYDAY
 import com.yeon.todaymorning.domain.model.WEEKDAYS
 import com.yeon.todaymorning.domain.model.WEEKEND
@@ -61,6 +67,7 @@ fun SettingsScreen(
     var showAlarmPicker by remember { mutableStateOf(false) }
     var showTargetPicker by remember { mutableStateOf(false) }
     var showSoundPicker by remember { mutableStateOf(false) }
+    var showVibrationPicker by remember { mutableStateOf(false) }
 
     // 휴대폰 시스템 알람음 선택기 결과 → content:// URI 저장
     val ringtonePicker = rememberLauncherForActivityResult(
@@ -89,7 +96,6 @@ fun SettingsScreen(
     }
 
     // TODO(미구현): 아래 상태들은 화면 표시용 로컬 상태. 저장/동작 연결 필요.
-    var vibrate by rememberSaveable { mutableStateOf(true) }
     var ttsOn by rememberSaveable { mutableStateOf(true) }
     var tts10 by rememberSaveable { mutableStateOf(true) }
     var tts5 by rememberSaveable { mutableStateOf(true) }
@@ -145,7 +151,7 @@ fun SettingsScreen(
                 RowDivider()
                 NavRow("🎵", "알람음", AlarmSounds.label(context, savedSettings.alarmSoundId), valueMarquee = true) { showSoundPicker = true }
                 RowDivider()
-                ToggleRow("📳", "진동", vibrate) { vibrate = it }          // TODO(미구현): 저장 연동
+                NavRow("📳", "진동", VibrationPatterns.label(savedSettings.vibrationPatternId)) { showVibrationPicker = true }
             }
 
             // ── 출근 경로 ─────────────────────────────────
@@ -264,6 +270,72 @@ fun SettingsScreen(
             onDismiss = { showSoundPicker = false }
         )
     }
+    if (showVibrationPicker) {
+        VibrationPatternDialog(
+            currentId = savedSettings.vibrationPatternId,
+            onConfirm = { id -> viewModel.setVibrationPattern(id); showVibrationPicker = false },
+            onDismiss = { showVibrationPicker = false }
+        )
+    }
+}
+
+/* ─────────────────────── 진동 패턴 선택 다이얼로그 ─────────────────────── */
+
+@Composable
+private fun VibrationPatternDialog(
+    currentId: String,
+    onConfirm: (String) -> Unit,    // 확인 눌렀을 때만 최종 저장
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+
+    // 임시 선택값 — 확인을 눌러야 commit 된다(요일반복 다이얼로그와 동일).
+    var selected by remember { mutableStateOf(currentId) }
+
+    // 미리보기 진동 — 다이얼로그가 닫히면 반드시 정리.
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+    fun stopPreview() = runCatching { vibrator.cancel() }
+    fun preview(id: String) {
+        stopPreview()
+        val pattern = VibrationPatterns.find(id)?.waveform ?: return  // OFF 면 진동 안 함
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))  // 다이얼로그 동안 반복
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(pattern, 0)
+            }
+        }
+    }
+    DisposableEffect(Unit) { onDispose { stopPreview() } }
+
+    AlertDialog(
+        onDismissRequest = { stopPreview(); onDismiss() },
+        confirmButton = {
+            TextButton(onClick = { stopPreview(); onConfirm(selected) }) { Text("확인", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = { stopPreview(); onDismiss() }) { Text("취소") }
+        },
+        title = { Text("진동", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column {
+                VibrationPatterns.PATTERNS.forEach { def ->
+                    SoundRow(def.label, selected == def.id) {
+                        selected = def.id
+                        preview(def.id)   // 탭하면 그 진동을 바로 느껴볼 수 있게
+                    }
+                }
+            }
+        }
+    )
 }
 
 /* ─────────────────────── 알람음 선택 다이얼로그 ─────────────────────── */
