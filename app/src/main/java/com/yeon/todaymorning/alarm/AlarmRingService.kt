@@ -6,9 +6,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.AssetFileDescriptor
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
@@ -18,7 +18,10 @@ import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.yeon.todaymorning.R
+import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.ui.AlarmRingActivity
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 /**
  * 알람음을 "소유"하는 포그라운드 서비스.
@@ -34,6 +37,7 @@ class AlarmRingService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
+    private var rawAfd: AssetFileDescriptor? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -56,14 +60,13 @@ class AlarmRingService : Service() {
 
     private fun startSound() {
         if (mediaPlayer != null) return
-        try {
-            // 알람 전용 음원 → 없으면 알림음 → 없으면 벨소리 순으로 폴백
-            val alarmUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        // 사용자가 고른 알람음 id 를 읽는다(서비스는 Hilt 미적용 → DataStore 직접 생성).
+        val soundId = runCatching {
+            runBlocking { UserSettingsDataStore(applicationContext).userSettings.first().alarmSoundId }
+        }.getOrDefault(AlarmSounds.DEFAULT_ID)
 
+        try {
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(this@AlarmRingService, alarmUri)
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -71,6 +74,10 @@ class AlarmRingService : Service() {
                         .build()
                 )
                 isLooping = true
+                if (!applyDataSource(this, soundId)) {
+                    // 선택 음원 적용 실패 → 시스템 기본 알람음으로 폴백
+                    applyDefaultDataSource(this)
+                }
                 prepare()
                 start()
             }
@@ -78,6 +85,30 @@ class AlarmRingService : Service() {
             Log.e(TAG, "알람음 재생 실패", e)
         }
     }
+
+    /** soundId 규칙(빈값=기본, builtin:=내장, 그 외=시스템 URI)에 맞춰 데이터소스 지정. 성공 여부 반환. */
+    private fun applyDataSource(mp: MediaPlayer, soundId: String): Boolean = runCatching {
+        when {
+            AlarmSounds.isBuiltIn(soundId) -> {
+                val builtIn = AlarmSounds.findBuiltIn(soundId) ?: return false
+                val afd = resources.openRawResourceFd(builtIn.resId) ?: return false
+                rawAfd = afd  // prepare 동안 fd 가 열려 있어야 하므로 정지 시점까지 보관
+                mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                true
+            }
+            soundId.isNotBlank() -> {
+                mp.setDataSource(this, Uri.parse(soundId))
+                true
+            }
+            else -> applyDefaultDataSource(mp)
+        }
+    }.getOrDefault(false)
+
+    private fun applyDefaultDataSource(mp: MediaPlayer): Boolean = runCatching {
+        val uri = AlarmSounds.defaultAlarmUri() ?: return false
+        mp.setDataSource(this, uri)
+        true
+    }.getOrDefault(false)
 
     private fun startVibration() {
         val vib = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -107,6 +138,8 @@ class AlarmRingService : Service() {
             Log.e(TAG, "알람음 정지 실패", e)
         }
         mediaPlayer = null
+        runCatching { rawAfd?.close() }
+        rawAfd = null
         vibrator?.cancel()
         vibrator = null
         stopForeground(STOP_FOREGROUND_REMOVE)

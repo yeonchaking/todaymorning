@@ -34,6 +34,14 @@ data class UserSettings(
     val alarmEnabled: Boolean = true,
     val repeatDays: Set<Int> = WEEKDAYS,   // Calendar 요일값 집합. 빈 집합 = 반복 없음
 
+    // ── 알람음 선택 ───────────────────────────────────
+    // "" = 폰 기본 알람음, "builtin:<key>" = 내장 음원, 그 외 = 시스템 ringtone content:// URI
+    // (규칙·해석은 com.yeon.todaymorning.alarm.AlarmSounds)
+    val alarmSoundId: String = "",
+    // 휴대폰에서 마지막으로 고른 시스템 알람음 URI. 현재 선택이 기본/내장이어도
+    // "최근 선택한 알람"으로 다이얼로그에 계속 표시하기 위해 별도 보관. "" = 고른 적 없음.
+    val lastPickedSoundId: String = "",
+
     // ── 집 위치 ───────────────────────────────────────
     val homeLat: Double = 0.0,
     val homeLng: Double = 0.0,

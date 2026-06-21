@@ -1,6 +1,17 @@
 package com.yeon.todaymorning.ui
 
+import android.app.Activity
+import android.content.Intent
+import android.content.res.AssetFileDescriptor
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,10 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.yeon.todaymorning.alarm.AlarmSounds
 import com.yeon.todaymorning.domain.model.EVERYDAY
 import com.yeon.todaymorning.domain.model.WEEKDAYS
 import com.yeon.todaymorning.domain.model.WEEKEND
@@ -37,6 +51,7 @@ fun SettingsScreen(
 ) {
     val savedSettings by viewModel.settings.collectAsState()
     val c = AppTheme.colors
+    val context = LocalContext.current
 
     var alarmHour by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) { mutableIntStateOf(savedSettings.alarmHour) }
     var alarmMinute by rememberSaveable(savedSettings.alarmHour, savedSettings.alarmMinute) { mutableIntStateOf(savedSettings.alarmMinute) }
@@ -45,6 +60,33 @@ fun SettingsScreen(
 
     var showAlarmPicker by remember { mutableStateOf(false) }
     var showTargetPicker by remember { mutableStateOf(false) }
+    var showSoundPicker by remember { mutableStateOf(false) }
+
+    // 휴대폰 시스템 알람음 선택기 결과 → content:// URI 저장
+    val ringtonePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            @Suppress("DEPRECATION")
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) viewModel.setPickedRingtone(uri.toString())
+            else viewModel.setAlarmSound(AlarmSounds.DEFAULT_ID)  // "기본음" 선택 시
+        }
+        // 다이얼로그는 닫지 않고 유지 → 방금 고른 "최근 선택한 알람"이 바로 보인다
+    }
+    fun launchRingtonePicker() {
+        val existing = savedSettings.alarmSoundId
+            .takeIf { it.isNotBlank() && !AlarmSounds.isBuiltIn(it) }
+            ?.let { Uri.parse(it) }
+        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "알람음 선택")
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existing)
+        }
+        ringtonePicker.launch(intent)
+    }
 
     // TODO(미구현): 아래 상태들은 화면 표시용 로컬 상태. 저장/동작 연결 필요.
     var vibrate by rememberSaveable { mutableStateOf(true) }
@@ -101,7 +143,7 @@ fun SettingsScreen(
                 RowDivider()
                 NavRow("🔁", "요일 반복", savedSettings.repeatDaysLabel) { showRepeatDialog = true }
                 RowDivider()
-                NavRow("🎵", "알람음", "기본 알람음") { comingSoon = true }   // TODO(미구현)
+                NavRow("🎵", "알람음", AlarmSounds.label(context, savedSettings.alarmSoundId), valueMarquee = true) { showSoundPicker = true }
                 RowDivider()
                 ToggleRow("📳", "진동", vibrate) { vibrate = it }          // TODO(미구현): 저장 연동
             }
@@ -213,6 +255,138 @@ fun SettingsScreen(
             onDismiss = { showRepeatDialog = false }
         )
     }
+    if (showSoundPicker) {
+        AlarmSoundDialog(
+            currentId = savedSettings.alarmSoundId,
+            lastPickedId = savedSettings.lastPickedSoundId,
+            onPick = { id -> viewModel.setAlarmSound(id) },
+            onPickFromPhone = { launchRingtonePicker() },
+            onDismiss = { showSoundPicker = false }
+        )
+    }
+}
+
+/* ─────────────────────── 알람음 선택 다이얼로그 ─────────────────────── */
+
+@Composable
+private fun AlarmSoundDialog(
+    currentId: String,
+    lastPickedId: String,            // 휴대폰에서 마지막으로 고른 알람음 ("최근 선택한 알람"으로 항상 표시)
+    onPick: (String) -> Unit,        // 기본/내장 음원 선택 → 즉시 저장
+    onPickFromPhone: () -> Unit,     // 휴대폰 시스템 알람음 선택기 실행
+    onDismiss: () -> Unit
+) {
+    val c = AppTheme.colors
+    val context = LocalContext.current
+
+    // 미리듣기 플레이어 — 다이얼로그가 닫히면 반드시 정리
+    val previewHolder = remember { mutableStateOf<MediaPlayer?>(null) }
+    val previewAfd = remember { mutableStateOf<AssetFileDescriptor?>(null) }  // prepare 동안 열려 있어야 함
+    fun stopPreview() {
+        previewHolder.value?.let { runCatching { it.stop(); it.release() } }
+        previewHolder.value = null
+        previewAfd.value?.let { runCatching { it.close() } }
+        previewAfd.value = null
+    }
+    fun playPreview(id: String) {
+        stopPreview()
+        runCatching {
+            val mp = MediaPlayer()
+            mp.setAudioAttributes(
+                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()
+            )
+            val builtIn = AlarmSounds.findBuiltIn(id)
+            when {
+                builtIn != null -> {
+                    val afd = context.resources.openRawResourceFd(builtIn.resId)
+                    previewAfd.value = afd  // stopPreview 시점까지 닫지 않는다
+                    mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                }
+                id == AlarmSounds.DEFAULT_ID || id.isBlank() ->
+                    AlarmSounds.defaultAlarmUri()?.let { mp.setDataSource(context, it) }
+                else -> mp.setDataSource(context, Uri.parse(id))
+            }
+            mp.setOnPreparedListener { it.start() }
+            mp.prepareAsync()
+            previewHolder.value = mp
+        }
+    }
+    DisposableEffect(Unit) { onDispose { stopPreview() } }
+
+    // 표시할 라디오 행: 기본 + 내장 음원들
+    val rows = buildList {
+        add(AlarmSounds.DEFAULT_ID to "기본 알람음")
+        AlarmSounds.BUILT_INS.forEach { add(AlarmSounds.builtInId(it.key) to it.label) }
+    }
+    // 휴대폰에서 고른 적이 있으면 그 음원을 "최근 선택한 알람"으로 항상 표시(현재 선택이 아니어도 유지)
+    val hasRecent = lastPickedId.isNotBlank()
+    val recentTitle = remember(lastPickedId) {
+        if (hasRecent) AlarmSounds.label(context, lastPickedId) else ""
+    }
+
+    AlertDialog(
+        onDismissRequest = { stopPreview(); onDismiss() },
+        confirmButton = {
+            TextButton(onClick = { stopPreview(); onDismiss() }) { Text("닫기", fontWeight = FontWeight.Bold) }
+        },
+        title = { Text("알람음", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column {
+                rows.forEach { (id, label) ->
+                    val selected = currentId == id || (id == AlarmSounds.DEFAULT_ID && currentId.isBlank())
+                    SoundRow(label, selected) { onPick(id); playPreview(id) }
+                }
+                Spacer(Modifier.height(10.dp))
+                // "휴대폰 알람음에서 고르기" + "최근 선택한 알람"을 같은 박스에 묶는다.
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .border(1.5.dp, c.primary, RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(12.dp))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                            .clickable { stopPreview(); onPickFromPhone() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("📱 휴대폰 알람음에서 고르기", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.primary)
+                    }
+                    // 휴대폰에서 고른 알람음은 "최근 선택한 알람"으로 박스 안에 항상 남는다.
+                    if (hasRecent) {
+                        RowDivider()
+                        val recentSelected = currentId == lastPickedId
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { onPick(lastPickedId); playPreview(lastPickedId) }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = recentSelected,
+                                onClick = { onPick(lastPickedId); playPreview(lastPickedId) }
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("최근 선택한 알람", fontSize = 11.5.sp, color = c.onVar)
+                                Text(recentTitle, fontSize = 15.sp, color = c.on)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun SoundRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick).padding(vertical = 6.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(label, fontSize = 15.sp, color = c.on, modifier = Modifier.weight(1f))
+    }
 }
 
 /* ─────────────────────── 요일 반복 선택 다이얼로그 ─────────────────────── */
@@ -322,8 +496,16 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NavRow(emoji: String, title: String, value: String, valueStrong: Boolean = false, onClick: () -> Unit) {
+private fun NavRow(
+    emoji: String,
+    title: String,
+    value: String,
+    valueStrong: Boolean = false,
+    valueMarquee: Boolean = false,   // 값이 길면 한 줄로 천천히 흐르게(슬라이드). 제목 줄바꿈 방지.
+    onClick: () -> Unit
+) {
     val c = AppTheme.colors
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 14.dp, horizontal = 2.dp),
@@ -331,12 +513,18 @@ private fun NavRow(emoji: String, title: String, value: String, valueStrong: Boo
         horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
         Text(emoji, fontSize = 20.sp)
-        Text(title, fontSize = 15.sp, color = c.on, modifier = Modifier.weight(1f))
+        // 제목은 항상 한 줄 고정 (긴 값에 밀려 줄바꿈되지 않도록)
+        Text(title, fontSize = 15.sp, color = c.on, maxLines = 1)
         Text(
             text = value,
             fontSize = if (valueStrong) 16.sp else 14.sp,
             fontWeight = if (valueStrong) FontWeight.ExtraBold else FontWeight.SemiBold,
-            color = if (valueStrong) c.primary else c.onVar
+            color = if (valueStrong) c.primary else c.onVar,
+            maxLines = 1,
+            textAlign = TextAlign.End,
+            modifier = Modifier
+                .weight(1f)
+                .then(if (valueMarquee) Modifier.basicMarquee() else Modifier)
         )
         Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = c.onVar)
     }

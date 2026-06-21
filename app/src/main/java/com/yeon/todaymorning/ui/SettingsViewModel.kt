@@ -49,6 +49,20 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** 알람음 선택(기본/내장/최근값)만 부분 저장. 알람 재등록 불필요(서비스가 울릴 때 읽음). */
+    fun setAlarmSound(soundId: String) {
+        viewModelScope.launch {
+            dataStore.saveAlarmSound(soundId)
+        }
+    }
+
+    /** 휴대폰에서 고른 알람음 → 선택 + "최근 선택한 알람"으로 동시 저장. */
+    fun setPickedRingtone(uri: String) {
+        viewModelScope.launch {
+            dataStore.savePickedRingtone(uri)
+        }
+    }
+
     /**
      * 미션 타겟만 부분 저장. 시각 키를 건드리지 않고 알람도 재등록하지 않으므로,
      * 설정 화면에서 저장 전 편집 중인 시각이 보존된다.
