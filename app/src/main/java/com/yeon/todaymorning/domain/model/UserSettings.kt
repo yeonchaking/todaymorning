@@ -47,6 +47,13 @@ data class UserSettings(
     // (규칙·해석은 com.yeon.todaymorning.alarm.VibrationPatterns)
     val vibrationPatternId: String = "basic",
 
+    // ── 음성 안내(TTS) ────────────────────────────────
+    // ttsEnabled = 전체 on/off. ttsTimings = 목표 시각까지 남은 '분' 기준 안내 시점 집합.
+    // 예: {10,5,3} = 출발 10·5·3분 전에 다음 차편을 음성으로 읽음.
+    // (발화 문장·재생은 com.yeon.todaymorning.alarm.TtsManager, 트리거는 TimeAttackViewModel)
+    val ttsEnabled: Boolean = true,
+    val ttsTimings: Set<Int> = setOf(10, 5, 3),
+
     // ── 집 위치 ───────────────────────────────────────
     val homeLat: Double = 0.0,
     val homeLng: Double = 0.0,

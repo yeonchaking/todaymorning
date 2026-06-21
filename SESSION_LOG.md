@@ -6,6 +6,33 @@
 
 ---
 
+## [2026-06-21] TTS 음성 안내 구현 — '버스 도착 기준 · 모든 차편' 트리거로 정착
+
+**방향/목표:** v2 placeholder였던 설정 "음성 안내(TTS)" 그룹(rememberSaveable 로컬 상태일 뿐 저장·동작 전무)을 실제 동작으로 닫음. 안드로이드 내장 TextToSpeech를 붙여, 타임어택 중 차편이 임박할 때 음성으로 읽어주도록 함. 알람음·진동과 같은 "registry/DataStore 부분저장 + 사용처에서 읽음" 구조를 재사용.
+
+**결정 사항:**
+- **트리거 기준을 '목표 시각'이 아니라 '버스 도착 시간'으로 변경** — 이유: 사용자 테스트에서 "버스가 5분 후 도착"일 때 울리길 기대. 출근 앱에선 "버스 5분 후 도착, 지금 나가라"가 데드라인 카운트다운보다 행동가능(actionable)함. 최초 구현(목표시각까지 10·5·3분)을 폐기하고 도착초 기준으로 재작성.
+- **'가장 가까운 1대'가 아니라 리스트의 '모든 차편' 각각 발화** — 이유: 사용자 요청("설정된 모든 버스, 리스트에 떠있는 모든 버스"). 차편을 `노선명|방면|동일그룹순번`으로 식별(노선당 1·2번째 도착 구분), 차편별로 직전 도착초를 추적해 하향 통과 시 발화. 같은 차편의 같은 시점은 `spokenMarks`로 1회만.
+- **도착초 < 0(정보없음/운행종료) 차편 제외** — 이유: -1이 오름차순 정렬상 맨 앞에 와서 '최단'으로 오판되어 트리거를 오염시킴. 유효 차편(≥0)만 대상으로.
+- **발화 문장에서 `[3번째 전]` 꼬리표 제거, 남은시간 접두사 없음** — 이유: 사용자 요청. "651번 버스가 5분후 도착 예정입니다"만. arrivalMessage의 `[` 이후를 잘라냄. 1분 이내는 "곧 도착합니다".
+- **발화 시 짧은 진동 동반(폴링당 1회) + 디버그 토스트** — 이유: 사용자 요청 + 트리거 동작이 눈에 안 보여 진단이 어려웠음. `⏱ N대 · 최단 ◯◯s`(폴링마다)와 `🔊 N분 전 안내`(트리거 시)로 가시화. 토스트는 검증용 임시물(신규 TODO로 제거 예약).
+- **TtsManager를 @Singleton으로 두지 않음** — 이유: TimeAttackViewModel onCleared에서 shutdown하므로, 싱글톤이면 재진입 시 죽은 엔진 재사용됨. ViewModel마다 새 인스턴스.
+- **여러 건 동시 발화는 QUEUE_ADD** — 이유: QUEUE_FLUSH면 앞 안내를 끊음. 한 폴링에 여러 대가 임계를 지나면 순차 재생.
+
+**코드/프로젝트 변화:**
+- 신규 `alarm/TtsManager.kt` — TextToSpeech(한국어) 래퍼. `sentenceFor`(순수 함수)에 대본 로직 집중, 엔진 미준비/언어 미지원 시 전부 무음 fallback.
+- `domain/model/UserSettings.kt` — `ttsEnabled`, `ttsTimings:Set<Int>` 필드 추가.
+- `data/datastore/UserSettingsDataStore.kt` — `TTS_ENABLED`/`TTS_TIMINGS`(CSV) 키, 전체 저장 반영, `saveTtsSettings` 부분저장.
+- `ui/SettingsViewModel.kt`/`SettingsScreen.kt` — 토글·시점칩을 저장값과 바인딩, 즉시 부분저장(로컬 rememberSaveable 제거).
+- `ui/timeattack/TimeAttackViewModel.kt` — `@ApplicationContext` 주입, `maybeAnnounce()`를 fetchArrivals(10초 폴링)에 연동, 차편별 추적(`lastSecondsByKey`/`spokenMarks`), `vibrate()`/`showToast()` 헬퍼, onCleared에서 ttsManager.shutdown. 카운트다운 루프에서는 TTS 분리(목표시각 기준 폐기).
+- **빌드는 미검증** — 이 세션 샌드박스에 Android SDK/JDK17 없음(정적 참조 일치만 확인). 실기기 빌드·동작 확인은 사용자 환경.
+
+**미해결/이관:** 화면이 꺼지면 폴링·카운트다운·TTS가 멈추는 구조적 한계 확인됨(viewModelScope 루프가 Activity 생명주기에 묶임). 포그라운드 Service 이전이 TTS 실사용의 전제 → 신규 TODO.
+
+**[TODO 리스트 변경]:**
+- 해결: v2 미구현 [0] "TTS 음성 안내"
+- 추가: (기능) "타임어택 백그라운드 동작 (포그라운드 Service 이전)" / (기타) "TTS 디버그 토스트 제거"
+
 ## [2026-06-21] 진동을 on/off 토글 → 패턴 선택 방식으로 전환
 
 **방향/목표:** v2 placeholder였던 설정 "진동" 토글(rememberSaveable 로컬 상태일 뿐 저장 안 됨)을 실제 동작으로 닫음. 동시에 단순 on/off 대신 사용자가 진동 세기/리듬을 고를 수 있게 "패턴 선택" UX로 확장. 직전 세션의 알람음 선택과 **같은 구조를 그대로 재사용**해 일관성 확보.

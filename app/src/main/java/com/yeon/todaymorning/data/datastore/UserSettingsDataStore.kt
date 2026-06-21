@@ -36,6 +36,8 @@ class UserSettingsDataStore(private val context: Context) {
         val ALARM_SOUND_ID = stringPreferencesKey("alarm_sound_id")  // "" | "builtin:<key>" | content:// URI
         val LAST_PICKED_SOUND_ID = stringPreferencesKey("last_picked_sound_id")  // 마지막으로 고른 시스템 알람음 URI
         val VIBRATION_PATTERN_ID = stringPreferencesKey("vibration_pattern_id")  // VibrationPatterns id ("off" | "basic" | ...)
+        val TTS_ENABLED = booleanPreferencesKey("tts_enabled")  // 음성 안내 전체 on/off
+        val TTS_TIMINGS = stringPreferencesKey("tts_timings")   // 안내 시점 '분' CSV, 예: "10,5,3"
 
         /** 요일 집합 ↔ 비트마스크 (bit n = Calendar 요일값 n, 일=1 … 토=7). */
         fun encodeDays(days: Set<Int>): Int = days.fold(0) { acc, d -> acc or (1 shl d) }
@@ -67,6 +69,11 @@ class UserSettingsDataStore(private val context: Context) {
             alarmSoundId = prefs[ALARM_SOUND_ID] ?: "",
             lastPickedSoundId = prefs[LAST_PICKED_SOUND_ID] ?: "",
             vibrationPatternId = prefs[VIBRATION_PATTERN_ID] ?: "basic",
+            ttsEnabled = prefs[TTS_ENABLED] ?: true,
+            // 키가 없으면 기본 {10,5,3}. 사용자가 모든 시점을 끈 경우는 빈 문자열 → 빈 집합 유지.
+            ttsTimings = prefs[TTS_TIMINGS]?.let { csv ->
+                csv.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+            } ?: setOf(10, 5, 3),
             homeLat = prefs[HOME_LAT] ?: 0.0,
             homeLng = prefs[HOME_LNG] ?: 0.0,
             homeAddress = prefs[HOME_ADDRESS] ?: "",
@@ -95,6 +102,8 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[ALARM_SOUND_ID] = settings.alarmSoundId
             prefs[LAST_PICKED_SOUND_ID] = settings.lastPickedSoundId
             prefs[VIBRATION_PATTERN_ID] = settings.vibrationPatternId
+            prefs[TTS_ENABLED] = settings.ttsEnabled
+            prefs[TTS_TIMINGS] = settings.ttsTimings.sortedDescending().joinToString(",")
             prefs[HOME_LAT] = settings.homeLat
             prefs[HOME_LNG] = settings.homeLng
             prefs[HOME_ADDRESS] = settings.homeAddress
@@ -152,6 +161,14 @@ class UserSettingsDataStore(private val context: Context) {
     suspend fun saveVibrationPattern(patternId: String) {
         context.dataStore.edit { prefs ->
             prefs[VIBRATION_PATTERN_ID] = patternId
+        }
+    }
+
+    /** 음성 안내(TTS) 설정만 부분 저장 (시각·알람 미변경). 타임어택 화면이 발화 시점에 읽음. */
+    suspend fun saveTtsSettings(enabled: Boolean, timings: Set<Int>) {
+        context.dataStore.edit { prefs ->
+            prefs[TTS_ENABLED] = enabled
+            prefs[TTS_TIMINGS] = timings.sortedDescending().joinToString(",")
         }
     }
 

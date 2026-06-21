@@ -95,11 +95,13 @@ fun SettingsScreen(
         ringtonePicker.launch(intent)
     }
 
-    // TODO(미구현): 아래 상태들은 화면 표시용 로컬 상태. 저장/동작 연결 필요.
-    var ttsOn by rememberSaveable { mutableStateOf(true) }
-    var tts10 by rememberSaveable { mutableStateOf(true) }
-    var tts5 by rememberSaveable { mutableStateOf(true) }
-    var tts3 by rememberSaveable { mutableStateOf(true) }
+    // 음성 안내(TTS) — 저장된 설정에서 파생. 토글 시 즉시 부분 저장(알람음·진동과 동일 UX).
+    val ttsOn = savedSettings.ttsEnabled
+    val ttsTimings = savedSettings.ttsTimings
+    fun toggleTtsTiming(minute: Int) {
+        val next = if (minute in ttsTimings) ttsTimings - minute else ttsTimings + minute
+        viewModel.setTtsSettings(ttsOn, next)
+    }
 
     var showRepeatDialog by remember { mutableStateOf(false) }
 
@@ -203,15 +205,15 @@ fun SettingsScreen(
 
             // ── 음성 안내 ─────────────────────────────────
             SettingsGroup("음성 안내") {
-                ToggleRow("🔊", "음성 안내 (TTS)", ttsOn) { ttsOn = it }   // TODO(미구현): 실제 TTS 연동
+                ToggleRow("🔊", "음성 안내 (TTS)", ttsOn) { viewModel.setTtsSettings(it, ttsTimings) }
                 RowDivider()
                 Column(modifier = Modifier.padding(vertical = 14.dp, horizontal = 2.dp)) {
                     Text("안내 시점", fontSize = 13.sp, color = c.onVar)
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TimingChip("10분 전", tts10, Modifier.weight(1f)) { tts10 = !tts10 }
-                        TimingChip("5분 전", tts5, Modifier.weight(1f)) { tts5 = !tts5 }
-                        TimingChip("3분 전", tts3, Modifier.weight(1f)) { tts3 = !tts3 }
+                        TimingChip("10분 전", 10 in ttsTimings, Modifier.weight(1f)) { toggleTtsTiming(10) }
+                        TimingChip("5분 전", 5 in ttsTimings, Modifier.weight(1f)) { toggleTtsTiming(5) }
+                        TimingChip("3분 전", 3 in ttsTimings, Modifier.weight(1f)) { toggleTtsTiming(3) }
                     }
                 }
             }

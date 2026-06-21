@@ -63,6 +63,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** 음성 안내(TTS) 설정만 부분 저장. 알람 재등록 불필요(타임어택 화면이 발화 시점에 읽음). */
+    fun setTtsSettings(enabled: Boolean, timings: Set<Int>) {
+        viewModelScope.launch {
+            dataStore.saveTtsSettings(enabled, timings)
+        }
+    }
+
     /** 휴대폰에서 고른 알람음 → 선택 + "최근 선택한 알람"으로 동시 저장. */
     fun setPickedRingtone(uri: String) {
         viewModelScope.launch {
