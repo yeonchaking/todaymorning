@@ -32,12 +32,28 @@ class TtsManager @Inject constructor(
     @Volatile
     private var ready = false
 
+    /** 엔진 초기화 + 한국어 사용 가능 여부. 진단·게이트용. */
+    val isReady: Boolean get() = ready
+
+    /** init 결과를 진단 토스트에 노출하기 위한 사유 코드. */
+    @Volatile
+    var initStatus: String = "초기화중"
+        private set
+
     private val tts: TextToSpeech = TextToSpeech(context) { status ->
         if (status == TextToSpeech.SUCCESS) {
             val result = runCatching { tts.setLanguage(Locale.KOREAN) }.getOrNull()
             ready = result != null &&
                 result != TextToSpeech.LANG_MISSING_DATA &&
                 result != TextToSpeech.LANG_NOT_SUPPORTED
+            initStatus = when (result) {
+                null -> "언어설정실패"
+                TextToSpeech.LANG_MISSING_DATA -> "한국어데이터없음"
+                TextToSpeech.LANG_NOT_SUPPORTED -> "한국어미지원"
+                else -> "준비완료"
+            }
+        } else {
+            initStatus = "엔진init실패($status)"
         }
     }
 

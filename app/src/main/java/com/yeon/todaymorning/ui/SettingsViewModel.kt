@@ -64,9 +64,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** 음성 안내(TTS) 설정만 부분 저장. 알람 재등록 불필요(타임어택 화면이 발화 시점에 읽음). */
-    fun setTtsSettings(enabled: Boolean, timings: Set<Int>) {
+    fun setTtsSettings(enabled: Boolean, timings: Set<Int>, leadMinutes: Int) {
         viewModelScope.launch {
-            dataStore.saveTtsSettings(enabled, timings)
+            dataStore.saveTtsSettings(enabled, timings, leadMinutes)
         }
     }
 

@@ -98,9 +98,13 @@ fun SettingsScreen(
     // 음성 안내(TTS) — 저장된 설정에서 파생. 토글 시 즉시 부분 저장(알람음·진동과 동일 UX).
     val ttsOn = savedSettings.ttsEnabled
     val ttsTimings = savedSettings.ttsTimings
+    val ttsLead = savedSettings.ttsLeadMinutes
     fun toggleTtsTiming(minute: Int) {
         val next = if (minute in ttsTimings) ttsTimings - minute else ttsTimings + minute
-        viewModel.setTtsSettings(ttsOn, next)
+        viewModel.setTtsSettings(ttsOn, next, ttsLead)
+    }
+    fun setTtsLead(minute: Int) {
+        viewModel.setTtsSettings(ttsOn, ttsTimings, minute)
     }
 
     var showRepeatDialog by remember { mutableStateOf(false) }
@@ -205,10 +209,25 @@ fun SettingsScreen(
 
             // ── 음성 안내 ─────────────────────────────────
             SettingsGroup("음성 안내") {
-                ToggleRow("🔊", "음성 안내 (TTS)", ttsOn) { viewModel.setTtsSettings(it, ttsTimings) }
+                ToggleRow("🔊", "음성 안내 (TTS)", ttsOn) { viewModel.setTtsSettings(it, ttsTimings, ttsLead) }
                 RowDivider()
                 Column(modifier = Modifier.padding(vertical = 14.dp, horizontal = 2.dp)) {
-                    Text("안내 시점", fontSize = 13.sp, color = c.onVar)
+                    Text("미션 음성안내 시작", fontSize = 13.sp, color = c.onVar)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "목표 시각 이만큼 전부터 음성안내가 켜져요 (화면 꺼져 있어도)",
+                        fontSize = 11.5.sp, color = c.onVar
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TimingChip("10분 전", ttsLead == 10, Modifier.weight(1f)) { setTtsLead(10) }
+                        TimingChip("15분 전", ttsLead == 15, Modifier.weight(1f)) { setTtsLead(15) }
+                        TimingChip("20분 전", ttsLead == 20, Modifier.weight(1f)) { setTtsLead(20) }
+                    }
+                }
+                RowDivider()
+                Column(modifier = Modifier.padding(vertical = 14.dp, horizontal = 2.dp)) {
+                    Text("차편별 안내 시점", fontSize = 13.sp, color = c.onVar)
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TimingChip("10분 전", 10 in ttsTimings, Modifier.weight(1f)) { toggleTtsTiming(10) }

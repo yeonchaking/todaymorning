@@ -3,7 +3,9 @@ package com.yeon.todaymorning.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
+import com.yeon.todaymorning.ui.AlarmRingActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -29,6 +31,17 @@ class AlarmReceiver : BroadcastReceiver() {
      */
     private fun fireAlarm(context: Context) {
         AlarmRingService.start(context)
+
+        // 알람화면을 곧바로 최상단에 띄운다.
+        // setAlarmClock 으로 울린 정확한 알람의 브로드캐스트는 잠깐 백그라운드 액티비티 실행이
+        // 허용되므로, 폰을 쓰는 중(화면 켜짐·잠금해제)에도 헤드업 알림이 아니라 슬라이드 화면이
+        // 바로 올라온다. (잠금/화면꺼짐 상황은 서비스의 풀스크린 인텐트가 백업한다.)
+        runCatching {
+            val intent = Intent(context, AlarmRingActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            context.startActivity(intent)
+        }.onFailure { Log.w("AlarmReceiver", "알람화면 직접 실행 실패(풀스크린 인텐트로 대체): ${it.message}") }
 
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {

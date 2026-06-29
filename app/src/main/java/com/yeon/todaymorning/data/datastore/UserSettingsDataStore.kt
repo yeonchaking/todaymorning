@@ -38,6 +38,9 @@ class UserSettingsDataStore(private val context: Context) {
         val VIBRATION_PATTERN_ID = stringPreferencesKey("vibration_pattern_id")  // VibrationPatterns id ("off" | "basic" | ...)
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")  // 음성 안내 전체 on/off
         val TTS_TIMINGS = stringPreferencesKey("tts_timings")   // 안내 시점 '분' CSV, 예: "10,5,3"
+        val TTS_LEAD_MINUTES = intPreferencesKey("tts_lead_minutes")  // 음성안내 시작 시점(목표 N분 전), 기본 15
+        val FLOATING_WIDGET_ENABLED = booleanPreferencesKey("floating_widget_enabled")  // 플로팅 위젯 on/off
+        val FLOATING_WIDGET_OPACITY = intPreferencesKey("floating_widget_opacity")  // 위젯 불투명도 % (30~100)
 
         /** 요일 집합 ↔ 비트마스크 (bit n = Calendar 요일값 n, 일=1 … 토=7). */
         fun encodeDays(days: Set<Int>): Int = days.fold(0) { acc, d -> acc or (1 shl d) }
@@ -74,6 +77,9 @@ class UserSettingsDataStore(private val context: Context) {
             ttsTimings = prefs[TTS_TIMINGS]?.let { csv ->
                 csv.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
             } ?: setOf(10, 5, 3),
+            ttsLeadMinutes = prefs[TTS_LEAD_MINUTES] ?: 15,
+            floatingWidgetEnabled = prefs[FLOATING_WIDGET_ENABLED] ?: true,
+            floatingWidgetOpacity = (prefs[FLOATING_WIDGET_OPACITY] ?: 90).coerceIn(30, 100),
             homeLat = prefs[HOME_LAT] ?: 0.0,
             homeLng = prefs[HOME_LNG] ?: 0.0,
             homeAddress = prefs[HOME_ADDRESS] ?: "",
@@ -104,6 +110,9 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[VIBRATION_PATTERN_ID] = settings.vibrationPatternId
             prefs[TTS_ENABLED] = settings.ttsEnabled
             prefs[TTS_TIMINGS] = settings.ttsTimings.sortedDescending().joinToString(",")
+            prefs[TTS_LEAD_MINUTES] = settings.ttsLeadMinutes
+            prefs[FLOATING_WIDGET_ENABLED] = settings.floatingWidgetEnabled
+            prefs[FLOATING_WIDGET_OPACITY] = settings.floatingWidgetOpacity
             prefs[HOME_LAT] = settings.homeLat
             prefs[HOME_LNG] = settings.homeLng
             prefs[HOME_ADDRESS] = settings.homeAddress
@@ -165,10 +174,25 @@ class UserSettingsDataStore(private val context: Context) {
     }
 
     /** 음성 안내(TTS) 설정만 부분 저장 (시각·알람 미변경). 타임어택 화면이 발화 시점에 읽음. */
-    suspend fun saveTtsSettings(enabled: Boolean, timings: Set<Int>) {
+    suspend fun saveTtsSettings(enabled: Boolean, timings: Set<Int>, leadMinutes: Int) {
         context.dataStore.edit { prefs ->
             prefs[TTS_ENABLED] = enabled
             prefs[TTS_TIMINGS] = timings.sortedDescending().joinToString(",")
+            prefs[TTS_LEAD_MINUTES] = leadMinutes
+        }
+    }
+
+    /** 플로팅 위젯 on/off 만 부분 저장. */
+    suspend fun saveFloatingWidget(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[FLOATING_WIDGET_ENABLED] = enabled
+        }
+    }
+
+    /** 플로팅 위젯 불투명도(%)만 부분 저장. */
+    suspend fun saveFloatingWidgetOpacity(opacity: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[FLOATING_WIDGET_OPACITY] = opacity.coerceIn(30, 100)
         }
     }
 

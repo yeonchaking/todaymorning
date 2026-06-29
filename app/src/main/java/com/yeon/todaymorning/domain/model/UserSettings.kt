@@ -53,6 +53,16 @@ data class UserSettings(
     // (발화 문장·재생은 com.yeon.todaymorning.alarm.TtsManager, 트리거는 TimeAttackViewModel)
     val ttsEnabled: Boolean = true,
     val ttsTimings: Set<Int> = setOf(10, 5, 3),
+    // 미션 음성안내가 '열리는' 시점 — 목표 시각까지 남은 분이 이 값 이하가 돼야 발화 시작.
+    // (ttsTimings 가 '각 차편 도착 N분 전'이라면, ttsLeadMinutes 는 '미션 전체 음성안내 시작 시점'.)
+    val ttsLeadMinutes: Int = 15,
+
+    // ── 플로팅 위젯 ───────────────────────────────────
+    // 미션 진행 중 다른 앱 위에 작은 위젯(남은시간+다음버스)을 띄울지. 미션 화면 토글로 제어.
+    // 실제 표시는 SYSTEM_ALERT_WINDOW 권한이 있어야 가능(없으면 조용히 미표시).
+    val floatingWidgetEnabled: Boolean = true,
+    // 위젯 불투명도(%) 30~100. 작을수록 투명. 위젯 전체(배경+글자)에 적용.
+    val floatingWidgetOpacity: Int = 90,
 
     // ── 집 위치 ───────────────────────────────────────
     val homeLat: Double = 0.0,
