@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -129,7 +130,8 @@ fun MainScreen(
     val showPermissionBanner by remember { mutableStateOf(!scheduler.canScheduleExactAlarms()) }
 
     val uiState by viewModel.uiState.collectAsState()
-    val settings by viewModel.settings.collectAsState()
+    // 생명주기 인지 수집 — 설정 화면에서 시각을 바꾸고 돌아오면 ON_START 에 재수집해 최신값 반영.
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
     val arrivalDialog by viewModel.arrivalDialog.collectAsState()
     val c = AppTheme.colors
 

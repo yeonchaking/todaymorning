@@ -47,9 +47,11 @@ class MainViewModel @Inject constructor(
     private val transitRepository: TransitRepository
 ) : ViewModel() {
 
+    // Lazily: 첫 구독 후 ViewModel 생존 동안 업스트림을 끊지 않는다 → .value 가 항상 DataStore
+    // 최신값을 유지하므로, 설정 화면에서 시각을 바꾸고 돌아왔을 때 옛 캐시값이 잠깐 보이지 않는다.
     val settings: StateFlow<UserSettings> = dataStore.userSettings.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.Lazily,
         initialValue = UserSettings()
     )
 
