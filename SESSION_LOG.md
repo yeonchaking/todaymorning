@@ -6,6 +6,65 @@
 
 ---
 
+## [2026-07-01] 히든 개발자모드 신설 + 진단 토스트 첫 적용
+
+**방향/목표:** 개발용 기능을 일반 사용자에게는 숨기고 필요할 때만 켤 수 있는 "개발자모드(isDev)" 스위치를 프로젝트 전반에 깔고, 이미 화면에 노출되던 진단용 토스트 중 하나를 그 첫 적용 대상으로 게이트했다.
+
+**결정 사항:**
+- 트리거를 메인 화면 타이틀 "오늘도출근" 10연속 탭으로 결정 — 이유: 설정 화면 등에 노출하면 일반 사용자도 우연히 발견할 수 있어 "히든" 의미가 없어짐.
+- `isDevMode`를 별도 저장소 대신 기존 `UserSettings`/`UserSettingsDataStore` 파이프라인에 편입 — 이유: `MissionEngine`처럼 이미 `dataStore.userSettings`를 읽는 곳에서 별도 배선 없이 바로 조건 검사 가능.
+- 진단 토스트 두 개(⏱ 폴링 상태, 🔊 안내 발화) 중 이번엔 ⏱ 폴링 토스트만 게이트 — 이유: 사용자가 지목한 범위가 폴링 토스트였음. 🔊 토스트는 범위 밖으로 남겨둠(아래 TODO 참고).
+
+**코드/프로젝트 변화:**
+- `domain/model/UserSettings.kt` — `isDevMode: Boolean = false` 필드 추가.
+- `data/datastore/UserSettingsDataStore.kt` — `IS_DEV_MODE` 키, `userSettings` flow 매핑, `saveSettings()` 반영, 부분저장 `saveDevMode()` 추가.
+- `ui/MainActivity.kt` — `TopHeader`의 타이틀 `Text`에 탭 카운터(`rememberSaveable` 아닌 `remember` — 프로세스 재시작 시 리셋) 추가, 10회 도달 시 콜백 호출 후 리셋.
+- `ui/main/MainViewModel.kt` — `toggleDevMode()` 추가: `isDevMode` 반전 저장 + "개발자모드가 설정/해제되었습니다" 토스트. `@ApplicationContext Context` 신규 주입.
+- `mission/MissionEngine.kt` — `maybeAnnounce`의 `⏱ N대·최단 ◯◯s...` 폴링 디버그 토스트를 `settings.isDevMode`일 때만 노출하도록 감쌈. `🔊 N분 전 안내` 토스트는 변경 없음(항상 노출).
+- **빌드 미검증** — 샌드박스에 Android SDK 없음(정적 참조 일치만 확인). 실기기/Android Studio 빌드 확인은 사용자 환경.
+
+**[TODO 리스트 변경]:**
+- 해결: 없음
+- 수정: 기타 작업의 "TTS 디버그 토스트 제거" 항목을 범위 축소 — ⏱ 폴링 토스트는 개발자모드 게이트로 해결됐으므로, 남은 "🔊 안내 토스트 정리" 여부만 별도 결정 대상으로 남김.
+
+---
+
+## [2026-06-29] 미션 백그라운드 상시 동작(포그라운드 서비스) + 노티/플로팅 위젯 + 알람 즉시 표시
+
+**방향/목표:** 화면을 꺼도 미션이 멈추던 구조적 한계(viewModelScope 루프가 Activity 생명주기에 묶임)를 풀고, 미션 진행 상태를 화면 밖에서도 보고/조작할 수 있게 만든다. 사용자 시나리오: 알람 후 폰을 보며 뒹굴다 준비하고, 화면을 다시 켰을 때 미션이 그대로 살아 있어야 한다. 음성안내·알림·플로팅 위젯 세 경로로 노출. 추가로 알람이 폰 사용 중에도 즉시 뜨도록, 메인 시각 표시가 변경을 못 따라오던 것도 수정.
+
+**결정 사항:**
+- **미션 로직을 화면에서 떼어 `MissionEngine`(@Singleton)으로, 호스팅은 `MissionService`(포그라운드)** — 이유: 폴링·카운트다운·TTS·기록이 ViewModel viewModelScope에 있으면 화면 STOP/Doze 시 멈춤. 엔진을 싱글톤으로 두고 포그라운드 서비스가 살리면 화면과 무관하게 10초 폴링이 지속됨. ViewModel은 엔진 위임형 얇은 어댑터로 축소.
+- **서비스 종료는 엔진이 판단(finished) → 서비스 stopSelf** — 이유: 성공/실패/목표경과 시점을 엔진이 알고, 서비스는 그 신호만 보고 내려가게 해 책임 분리. 기존 매일 자동실패 재등록 체인(MissionFailReceiver)은 의존성 때문에 손대지 않음.
+- **foregroundServiceType=dataSync** — 이유: 주기 네트워크 갱신이 핵심 행위. 단 Play 심사 사유 제출 대상 + Android15 6시간/일 제한(아침 미션엔 충분) → 신규 TODO로 검토 예약.
+- **TTS '미션 시작 게이트'를 ttsTimings 와 분리(ttsLeadMinutes, 기본 15)** — 이유: 기존 ttsTimings={10,5,3}은 '각 차편 도착 N분 전' 의미. "막 40분 전부터 들을 필요 없다"는 요청은 '미션 전체 음성안내 시작 시점'이라 별도 개념. 목표 lead분 전부터만 발화.
+- **TTS 진단 정보(initStatus/isReady) 토스트 노출** — 이유: 사용자 테스트에서 "음성 안 나옴"이 트리거 미발생인지 엔진(한국어 데이터)인지 게이트인지 구분 불가였음. ⏱ 토스트에 엔진상태·게이트(열림/닫힘) 표기 → 원인이 게이트였음을 사용자와 함께 특정.
+- **알림 남은시간은 시스템 크로노미터(카운트다운)** — 이유: 1초마다 재notify 없이 시스템이 갱신 → 배터리/깜빡임 회피. 다음 버스 텍스트만 주기 갱신.
+- **알림/위젯 도착정보 갱신을 emission 구독 대신 주기 폴링(현재값 직접 읽기)으로** — 이유: collectLatest 가 첫 빈 값만 반영하고 이후 갱신을 못 받던 증상. 엔진 .value 를 주기적으로 읽어 그리니 emission 타이밍/conflation 무관하게 안정적.
+- **버스 2대 두 줄 표시** — 이유: 사용자 요청. 위젯은 멀티라인 TextView, 알림은 BigTextStyle(접힘=첫 줄, 펼침=두 줄, 접힌 알림은 한 줄 한계).
+- **플로팅 위젯은 전통 View(WindowManager TYPE_APPLICATION_OVERLAY)** — 이유: 오버레이용 Compose LifecycleOwner 세팅이 번거로움. 드래그 이동 + (slop 이내) 탭 시 앱 진입. 투명도는 root.alpha 로 위젯 전체 적용.
+- **위젯 on/off·투명도를 미션 화면에서 제어(DataStore 저장, 서비스가 구독)** — 이유: 사용자 요청. 토글/투명도 변경이 1초 내 위젯에 반영. 권한 미허용 시 허용 유도.
+- **알람 시 AlarmReceiver 에서 액티비티 직접 실행** — 이유: 풀스크린 인텐트는 잠금/화면꺼짐에만 즉시 동작, 폰 사용 중엔 헤드업만. setAlarmClock 정확알람 브로드캐스트는 잠깐 BAL 허용되므로 거기서 AlarmRingActivity 직접 startActivity → 사용 중에도 슬라이드 화면 즉시 표시. 풀스크린 인텐트는 백업으로 유지.
+- **메인 settings 를 Lazily + collectAsStateWithLifecycle** — 이유: WhileSubscribed(5s)면 설정 화면에 오래 머문 뒤 복귀 시 옛 캐시값이 잠깐 보임. Lazily 로 .value 를 항상 최신 유지 + 복귀(ON_START) 재수집.
+
+**코드/프로젝트 변화:**
+- 신규 `mission/MissionEngine.kt`(@Singleton, 폴링·카운트다운·TTS·기록·15분 게이트), `mission/MissionOverlay.kt`(오버레이 위젯), `alarm/MissionService.kt`(포그라운드 호스트+알림+위젯 루프).
+- `ui/timeattack/TimeAttackViewModel.kt` — 엔진 위임형으로 재작성, 진입 시 서비스 기동, 위젯 토글/투명도 setter.
+- `ui/timeattack/TimeAttackScreen.kt` — 플로팅 위젯 토글+투명도 슬라이더+권한 유도.
+- `domain/model/UserSettings.kt`/`data/datastore/UserSettingsDataStore.kt` — ttsLeadMinutes, floatingWidgetEnabled, floatingWidgetOpacity 추가·저장.
+- `ui/SettingsViewModel.kt`/`SettingsScreen.kt` — setTtsSettings(lead) 시그니처, '미션 음성안내 시작' 칩 + '차편별 안내 시점' 분리.
+- `alarm/TtsManager.kt` — isReady/initStatus 노출.
+- `alarm/AlarmReceiver.kt` — 알람화면 직접 실행 추가.
+- `ui/main/MainViewModel.kt`/`ui/MainActivity.kt` — settings Lazily + collectAsStateWithLifecycle.
+- `AndroidManifest.xml` — MissionService 등록, FOREGROUND_SERVICE_DATA_SYNC, SYSTEM_ALERT_WINDOW.
+- **빌드 미검증** — 샌드박스에 Android SDK/JDK17 없음(정적 참조 일치만 확인). 실기기 빌드·동작 확인은 사용자 환경.
+
+**[TODO 리스트 변경]:**
+- 해결: "타임어택 백그라운드 동작 (포그라운드 Service 이전)" — 미션 엔진/서비스로 닫음.
+- 추가: (UI) 플로팅 위젯 — 우리 앱이 전면일 때 숨기기(현재 미션 화면 위에도 겹쳐 뜸); (제출 게이트) SYSTEM_ALERT_WINDOW 권한 Play 사유 제출; (제출 게이트) MissionService dataSync 타입 적절성 재검토.
+
+---
+
 ## [2026-06-21] TTS 음성 안내 구현 — '버스 도착 기준 · 모든 차편' 트리거로 정착
 
 **방향/목표:** v2 placeholder였던 설정 "음성 안내(TTS)" 그룹(rememberSaveable 로컬 상태일 뿐 저장·동작 전무)을 실제 동작으로 닫음. 안드로이드 내장 TextToSpeech를 붙여, 타임어택 중 차편이 임박할 때 음성으로 읽어주도록 함. 알람음·진동과 같은 "registry/DataStore 부분저장 + 사용처에서 읽음" 구조를 재사용.

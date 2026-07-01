@@ -203,11 +203,13 @@ class MissionEngine @Inject constructor(
         val gateOpen = remaining <= settings.ttsLeadMinutes * 60L
         val valid = _arrivals.value.filter { it.arrivalSeconds >= 0 }
 
-        // 디버그: 차편 수·최단 도착초 + TTS설정/엔진상태 + 게이트(15분전) 상태 표시(추후 제거 — TODO).
-        showToast(
-            "⏱ ${valid.size}대·최단 ${valid.firstOrNull()?.arrivalSeconds ?: "없음"}s · TTS ${if (settings.ttsEnabled) "ON" else "OFF"} · 엔진 ${tts?.initStatus ?: "없음"} · 안내 ${if (gateOpen) "열림" else "닫힘(${remaining / 60}분남음)"}",
-            short = true
-        )
+        // 디버그: 차편 수·최단 도착초 + TTS설정/엔진상태 + 게이트(15분전) 상태 표시. 개발자모드일 때만 노출.
+        if (settings.isDevMode) {
+            showToast(
+                "⏱ ${valid.size}대·최단 ${valid.firstOrNull()?.arrivalSeconds ?: "없음"}s · TTS ${if (settings.ttsEnabled) "ON" else "OFF"} · 엔진 ${tts?.initStatus ?: "없음"} · 안내 ${if (gateOpen) "열림" else "닫힘(${remaining / 60}분남음)"}",
+                short = true
+            )
+        }
 
         // 음성안내 시작 시점 게이트: 목표 lead 분 전이 되기 전엔 침묵.
         if (!gateOpen) return

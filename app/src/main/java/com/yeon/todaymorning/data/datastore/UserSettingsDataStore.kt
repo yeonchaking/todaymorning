@@ -58,6 +58,8 @@ class UserSettingsDataStore(private val context: Context) {
         val MISSION_STOP_ID = stringPreferencesKey("mission_stop_id")
         val MISSION_STOP_NAME = stringPreferencesKey("mission_stop_name")
         val MISSION_ROUTES = stringPreferencesKey("mission_routes")  // JSON List<MissionRoute>
+
+        val IS_DEV_MODE = booleanPreferencesKey("is_dev_mode")  // 히든 개발자모드 on/off
     }
 
     val userSettings: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -93,7 +95,8 @@ class UserSettingsDataStore(private val context: Context) {
             missionStopName = prefs[MISSION_STOP_NAME] ?: "",
             missionRoutes = prefs[MISSION_ROUTES]?.takeIf { it.isNotBlank() }?.let {
                 runCatching { gson.fromJson<List<MissionRoute>>(it, missionRoutesType) }.getOrNull()
-            } ?: emptyList()
+            } ?: emptyList(),
+            isDevMode = prefs[IS_DEV_MODE] ?: false
         )
     }
 
@@ -123,6 +126,14 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[MISSION_STOP_ID] = settings.missionStopId
             prefs[MISSION_STOP_NAME] = settings.missionStopName
             prefs[MISSION_ROUTES] = gson.toJson(settings.missionRoutes)
+            prefs[IS_DEV_MODE] = settings.isDevMode
+        }
+    }
+
+    /** 개발자모드 on/off만 부분 저장 (타이틀 10연속 탭 트리거). */
+    suspend fun saveDevMode(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[IS_DEV_MODE] = enabled
         }
     }
 

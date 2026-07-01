@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -155,7 +156,7 @@ fun MainScreen(
         contentPadding = PaddingValues(bottom = 22.dp)
     ) {
         // 상단바
-        item { TopHeader(onSettings = onNavigateToSettings) }
+        item { TopHeader(onSettings = onNavigateToSettings, onTitleTapped = { viewModel.toggleDevMode() }) }
 
         // 권한 경고 배너
         if (showPermissionBanner) {
@@ -292,9 +293,14 @@ fun MainScreen(
 
 /* ───────────────────────────── 상단바 ───────────────────────────── */
 
+// 히든 개발자모드 트리거에 필요한 연속 탭 횟수.
+private const val DEV_MODE_TAP_COUNT = 10
+
 @Composable
-private fun TopHeader(onSettings: () -> Unit) {
+private fun TopHeader(onSettings: () -> Unit, onTitleTapped: () -> Unit = {}) {
     val c = AppTheme.colors
+    // 타이틀 연속 탭 카운터 — 화면 상태로만 관리(프로세스 재시작 시 리셋), 10회 도달 시 콜백 후 리셋.
+    var tapCount by remember { mutableStateOf(0) }
     Surface(color = c.surface, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -305,7 +311,22 @@ private fun TopHeader(onSettings: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("오늘도출근", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = c.on)
+            Text(
+                "오늘도출근",
+                fontSize = 21.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = c.on,
+                modifier = Modifier.clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {
+                    tapCount++
+                    if (tapCount >= DEV_MODE_TAP_COUNT) {
+                        tapCount = 0
+                        onTitleTapped()
+                    }
+                }
+            )
             IconButton(onClick = onSettings) {
                 Icon(Icons.Default.Settings, contentDescription = "설정", tint = c.onVar)
             }

@@ -1,5 +1,9 @@
 package com.yeon.todaymorning.ui.main
 
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yeon.todaymorning.alarm.AlarmScheduler
@@ -10,6 +14,7 @@ import com.yeon.todaymorning.data.repository.TransitRepository
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.TransitArrival
 import com.yeon.todaymorning.domain.model.UserSettings
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +49,8 @@ class MainViewModel @Inject constructor(
     private val repository: MissionRepository,
     private val dataStore: UserSettingsDataStore,
     private val alarmScheduler: AlarmScheduler,
-    private val transitRepository: TransitRepository
+    private val transitRepository: TransitRepository,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     // Lazily: 첫 구독 후 ViewModel 생존 동안 업스트림을 끊지 않는다 → .value 가 항상 DataStore
@@ -119,6 +125,18 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.saveAlarmEnabled(enabled)
             alarmScheduler.applyAlarm(settings.value.copy(alarmEnabled = enabled))
+        }
+    }
+
+    /** 타이틀 10연속 탭 트리거로 호출 — 개발자모드 반전 저장 + 안내 토스트. */
+    fun toggleDevMode() {
+        viewModelScope.launch {
+            val newValue = !settings.value.isDevMode
+            dataStore.saveDevMode(newValue)
+            val msg = if (newValue) "개발자모드가 설정되었습니다" else "개발자모드가 해제되었습니다"
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

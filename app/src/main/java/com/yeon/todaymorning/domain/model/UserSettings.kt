@@ -78,7 +78,11 @@ data class UserSettings(
     val missionTransitType: MissionTransitType = MissionTransitType.NONE,
     val missionStopId: String = "",            // 버스: arsId / 지하철: 역 이름
     val missionStopName: String = "",          // 표시용: "강남역"
-    val missionRoutes: List<MissionRoute> = emptyList()  // 선택한 노선들 (아무거나 타면 성공)
+    val missionRoutes: List<MissionRoute> = emptyList(),  // 선택한 노선들 (아무거나 타면 성공)
+
+    // ── 개발자모드 (히든) ─────────────────────────────
+    // 메인 화면 타이틀 10연속 탭으로 on/off. 진단용 토스트 등 개발용 기능의 게이트.
+    val isDevMode: Boolean = false
 ) {
     val hasHomeLocation: Boolean get() = homeLat != 0.0 && homeLng != 0.0
     val hasWorkLocation: Boolean get() = workLat != 0.0 && workLng != 0.0
