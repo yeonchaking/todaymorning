@@ -12,11 +12,16 @@ import androidx.navigation.navArgument
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.ui.busselect.BusSelectScreen
 import com.yeon.todaymorning.ui.locationpicker.LocationPickerScreen
+import com.yeon.todaymorning.ui.onboarding.PermissionOnboardingScreen
+import com.yeon.todaymorning.ui.onboarding.allOnboardingPermissionsGranted
 import com.yeon.todaymorning.ui.result.MissionResultScreen
 import com.yeon.todaymorning.ui.routeselect.RouteSelectScreen
 import com.yeon.todaymorning.ui.timeattack.TimeAttackScreen
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 
 object Routes {
+    const val ONBOARDING = "onboarding"
     const val MAIN = "main"
     const val SETTINGS = "settings"
     const val HOME_PICKER = "home_picker"
@@ -45,10 +50,28 @@ fun NavGraph(
         }
     }
 
+    // 알람으로 열린 경우는 기존 흐름을 그대로 존중해 온보딩으로 가로채지 않는다.
+    // 그 외 일반 실행이면 앱을 열 때마다(프로세스 재시작 시) 권한 3종을 다시 평가해서
+    // 하나라도 없으면 온보딩부터 시작한다(정확한 알람·전체화면 인텐트·알림 — 하드 게이트).
+    val context = LocalContext.current
+    val startDestination = remember {
+        if (fromAlarm || allOnboardingPermissionsGranted(context)) Routes.MAIN else Routes.ONBOARDING
+    }
+
     NavHost(
         navController = navController,
-        startDestination = Routes.MAIN
+        startDestination = startDestination
     ) {
+        composable(Routes.ONBOARDING) {
+            PermissionOnboardingScreen(
+                onAllGranted = {
+                    navController.navigate(Routes.MAIN) {
+                        popUpTo(Routes.ONBOARDING) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(Routes.MAIN) {
             MainScreen(
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },

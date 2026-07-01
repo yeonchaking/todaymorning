@@ -1,17 +1,9 @@
 package com.yeon.todaymorning.ui
 
-import android.Manifest
-import android.app.NotificationManager
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,14 +23,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
 import com.yeon.todaymorning.alarm.AlarmScheduler
@@ -66,37 +56,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var alarmScheduler: AlarmScheduler  // kept for future use
     private var fromAlarm by mutableStateOf(false)
 
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* 결과 무시 — UI에서 배너로 처리 */ }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Android 13+ 알림 권한 요청
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
+        // 권한 요청(정확한 알람·전체화면 인텐트·알림)은 전부 PermissionOnboardingScreen이 담당한다.
+        // (NavGraph가 시작화면으로 온보딩을 고르는 기준 — allOnboardingPermissionsGranted)
         alarmScheduler = AlarmScheduler(this)
         fromAlarm = intent.getBooleanExtra(EXTRA_FROM_ALARM, false)
-
-        // Android 14+: USE_FULL_SCREEN_INTENT 권한 별도 허용 필요
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val nm = getSystemService(NotificationManager::class.java)
-            if (!nm.canUseFullScreenIntent()) {
-                startActivity(
-                    Intent(
-                        Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-                        Uri.parse("package:$packageName")
-                    )
-                )
-            }
-        }
 
         enableEdgeToEdge()
         setContent {
@@ -126,10 +92,6 @@ fun MainScreen(
     onStartTimeAttack: () -> Unit,
     viewModel: MainViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
-    val scheduler = remember { AlarmScheduler(context) }
-    val showPermissionBanner by remember { mutableStateOf(!scheduler.canScheduleExactAlarms()) }
-
     val uiState by viewModel.uiState.collectAsState()
     // 생명주기 인지 수집 — 설정 화면에서 시각을 바꾸고 돌아오면 ON_START 에 재수집해 최신값 반영.
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -157,25 +119,6 @@ fun MainScreen(
     ) {
         // 상단바
         item { TopHeader(onSettings = onNavigateToSettings, onTitleTapped = { viewModel.toggleDevMode() }) }
-
-        // 권한 경고 배너
-        if (showPermissionBanner) {
-            item {
-                PermissionBanner(
-                    onOpenSettings = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                    Uri.parse("package:${context.packageName}")
-                                )
-                            )
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-        }
 
         // 알람 마스터 스위치
         item {
@@ -672,24 +615,6 @@ private fun AppCard(
         shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(padding), content = content)
-    }
-}
-
-@Composable
-private fun PermissionBanner(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "⚠️ 정확한 알람 권한이 필요해요",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = onOpenSettings) { Text("설정에서 허용하기") }
-        }
     }
 }
 
