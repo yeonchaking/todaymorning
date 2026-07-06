@@ -35,6 +35,8 @@ import com.kakao.vectormap.LatLng
 import com.kakao.vectormap.MapLifeCycleCallback
 import com.kakao.vectormap.MapView
 import com.kakao.vectormap.camera.CameraUpdateFactory
+import com.yeon.todaymorning.ui.common.EmptyStateText
+import com.yeon.todaymorning.ui.common.InlineLoading
 
 private val DEFAULT_CENTER = LatLng.from(37.5666, 126.9784)
 
@@ -303,11 +305,7 @@ private fun AddressSearchDialog(
 
                 when {
                     isSearching -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text("검색 중...", style = MaterialTheme.typography.bodyMedium)
-                        }
+                        InlineLoading(label = "검색 중...")
                     }
                     results.isNotEmpty() -> {
                         LazyColumn(modifier = Modifier.heightIn(max = 260.dp)) {
@@ -328,11 +326,7 @@ private fun AddressSearchDialog(
                         }
                     }
                     errorMessage != null -> {
-                        Text(
-                            text = errorMessage,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        EmptyStateText(text = errorMessage)
                     }
                 }
 

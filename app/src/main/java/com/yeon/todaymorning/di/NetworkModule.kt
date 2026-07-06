@@ -1,5 +1,6 @@
 package com.yeon.todaymorning.di
 
+import com.yeon.todaymorning.BuildConfig
 import com.yeon.todaymorning.data.api.BusApiService
 import com.yeon.todaymorning.data.api.KakaoLocalApiService
 import com.yeon.todaymorning.data.api.SubwayApiService
@@ -19,9 +20,15 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+    // 릴리즈 빌드에서 API 키·응답 바디가 로그캣에 그대로 찍히는 걸 막기 위해
+    // BODY(전체 요청/응답 본문)는 디버그 빌드에서만, 릴리즈는 BASIC(URL·상태코드만)으로.
     private fun buildOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.BASIC
+            }
         })
         .build()
 

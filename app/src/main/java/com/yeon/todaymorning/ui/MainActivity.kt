@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,6 +58,9 @@ class MainActivity : ComponentActivity() {
     private var fromAlarm by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 스플래시 화면(Theme.Todaymorning.Splash) 설치 — super.onCreate() 이전에 호출해야 한다.
+        // 로고 교체는 res/drawable/splash_icon.xml 한 파일만 바꾸면 됨(테마·코드 변경 불필요).
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         // 권한 요청(정확한 알람·전체화면 인텐트·알림)은 전부 PermissionOnboardingScreen이 담당한다.

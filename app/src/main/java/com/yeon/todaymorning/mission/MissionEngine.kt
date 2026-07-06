@@ -45,7 +45,10 @@ import javax.inject.Singleton
  *
  * 화면(ViewModel)은 이 엔진의 StateFlow 를 구독만 하고, 사용자 액션을 forward 한다.
  *
- * 생명주기: [start] 로 시작, 미션 종료(성공/실패/목표시각 경과) 시 [finished] 가 true 가 된다.
+ * 생명주기: [start] 로 시작, 미션 종료(사용자가 [onBoardingSuccess]/[onMissionFail] 로 직접
+ * 성공/실패를 확정한 시점) 시 [finished] 가 true 가 된다. **목표 시각 경과 자체는 종료 신호가
+ * 아니다** — 이 화면은 목표 시각을 살짝 넘겨 도착하는 차편도 "타면 성공"으로 인정하는 설계라,
+ * 시각이 지나도 사용자가 성공/실패를 직접 고를 때까지 도착 폴링·TTS·서비스는 계속 살아있어야 한다.
  * 서비스는 [finished] 를 보고 [stop] 을 호출해 정리 후 자신을 종료한다.
  */
 @Singleton
@@ -125,10 +128,12 @@ class MissionEngine @Inject constructor(
                 _remainingSeconds.value = remaining
 
                 if (_missionState.value != MissionState.Active) break
-                // 목표 시각 경과 — 미션 창이 닫힘. 자동실패 DB 기록은 MissionFailReceiver 가
-                // 담당하므로 여기선 추적만 종료한다(중복 기록 방지).
+                // 목표 시각 경과 — 카운트다운 표시만 멈춘다. 목표 시각을 살짝 넘겨 도착하는
+                // 차편도 "타면 성공"으로 인정하는 화면이라(하단 액션이 성공/실패 수동 선택으로
+                // 바뀜), 여기서 markFinished()를 부르면 안 된다 — 부르는 순간 폴링(fetchArrivals/
+                // TTS)이 멈추고 MissionService 도 즉시 내려가서, 정작 사용자가 결정하는 동안
+                // 도착정보·음성안내가 끊긴다. 실제 종료는 [onBoardingSuccess]/[onMissionFail].
                 if (remaining <= 0) {
-                    markFinished()
                     break
                 }
                 delay(1000L)

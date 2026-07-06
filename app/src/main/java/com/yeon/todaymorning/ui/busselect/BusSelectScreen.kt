@@ -41,6 +41,8 @@ import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.yeon.todaymorning.R
 import com.yeon.todaymorning.domain.model.BusStop
+import com.yeon.todaymorning.ui.common.EmptyStateText
+import com.yeon.todaymorning.ui.common.SectionLoading
 
 // 기본 카메라: 서울시청
 private val DEFAULT_CENTER = LatLng.from(37.5666, 126.9784)
@@ -267,14 +269,13 @@ fun BusSelectScreen(
                 when {
                     state.isLoadingRoutes -> {
                         Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
+                            SectionLoading()
                         }
                     }
                     state.routesAtStop.isEmpty() -> {
-                        Text(
-                            "이 정류장의 노선 정보를 불러오지 못했어요. 다른 정류장을 선택해 주세요.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        EmptyStateText(
+                            text = "이 정류장의 노선 정보를 불러오지 못했어요. 다른 정류장을 선택해 주세요.",
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                         )
                     }
                     else -> {

@@ -25,7 +25,8 @@ import javax.inject.Inject
  * (2) 엔진의 StateFlow 를 화면에 그대로 노출하며, (3) 사용자 액션을 엔진으로 forward 한다.
  *
  * 화면을 떠나도 미션은 계속된다 — onCleared 에서 서비스/엔진을 멈추지 않는다.
- * 미션 종료(성공/실패/목표경과)는 엔진이 판단하고 서비스가 스스로 내려간다.
+ * 미션 종료(사용자가 직접 성공/실패를 선택하는 시점)는 엔진이 판단하고 서비스가 스스로 내려간다.
+ * 목표 시각이 지나도 그 자체로는 종료되지 않는다 — [MissionEngine] 문서 참고.
  */
 @HiltViewModel
 class TimeAttackViewModel @Inject constructor(

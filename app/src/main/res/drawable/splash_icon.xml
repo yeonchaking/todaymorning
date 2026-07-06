@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    스플래시 화면 전용 로고. 런처 아이콘(ic_launcher_foreground.xml)과 내용은 같지만
+    독립된 리소스로 분리해 두었다 — 나중에 로고를 바꾸고 싶으면 이 파일만 교체하면
+    되고(같은 파일명 "splash_icon"으로 벡터를 새로 만들거나 PNG로 교체), 런처 아이콘이나
+    다른 화면에는 영향이 없다.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 해 (떠오르는 아침) -->
+    <path
+        android:pathData="M54,37.5m-19.5,0a19.5,19.5 0,1 1,39 0a19.5,19.5 0,1 1,-39 0"
+        android:fillColor="#FFB300"/>
+    <!-- 햇살 -->
+    <group>
+        <path android:pathData="M54,8.5L54,14" android:strokeColor="#FFD54F" android:strokeWidth="3" android:strokeLineCap="round"/>
+        <path android:pathData="M30.5,37.5L25,37.5" android:strokeColor="#FFD54F" android:strokeWidth="3" android:strokeLineCap="round"/>
+        <path android:pathData="M77.5,37.5L83,37.5" android:strokeColor="#FFD54F" android:strokeWidth="3" android:strokeLineCap="round"/>
+        <path android:pathData="M36.5,20L32.5,16" android:strokeColor="#FFD54F" android:strokeWidth="3" android:strokeLineCap="round"/>
+        <path android:pathData="M71.5,20L75.5,16" android:strokeColor="#FFD54F" android:strokeWidth="3" android:strokeLineCap="round"/>
+    </group>
+    <!-- 버스 차체 -->
+    <path
+        android:pathData="M31,47 L77,47 A7,7 0,0 1,84 54 L84,84 L24,84 L24,54 A7,7 0,0 1,31 47 Z"
+        android:fillColor="#FFFFFF"/>
+    <!-- 상단 노선 띠 -->
+    <path
+        android:pathData="M31,47 L77,47 A7,7 0,0 1,84 54 L24,54 A7,7 0,0 1,31 47 Z"
+        android:fillColor="#1565C0"/>
+    <!-- 창문 -->
+    <path android:pathData="M30,58 L49,58 A3,3 0,0 1,52 61 L52,72 A3,3 0,0 1,49 75 L30,75 A3,3 0,0 1,27 72 L27,61 A3,3 0,0 1,30 58 Z" android:fillColor="#64B5F6"/>
+    <path android:pathData="M59,58 L78,58 A3,3 0,0 1,81 61 L81,72 A3,3 0,0 1,78 75 L59,75 A3,3 0,0 1,56 72 L56,61 A3,3 0,0 1,59 58 Z" android:fillColor="#64B5F6"/>
+    <!-- 바퀴 -->
+    <path android:pathData="M37,84m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0" android:fillColor="#0D47A1"/>
+    <path android:pathData="M37,84m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" android:fillColor="#FFFFFF"/>
+    <path android:pathData="M71,84m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0" android:fillColor="#0D47A1"/>
+    <path android:pathData="M71,84m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" android:fillColor="#FFFFFF"/>
+</vector>

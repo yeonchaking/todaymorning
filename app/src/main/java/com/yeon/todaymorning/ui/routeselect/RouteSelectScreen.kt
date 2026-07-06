@@ -14,6 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.yeon.todaymorning.ui.common.EmptyStateText
+import com.yeon.todaymorning.ui.common.ErrorStateText
+import com.yeon.todaymorning.ui.common.SectionLoading
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,38 +59,26 @@ fun RouteSelectScreen(
         ) {
             when {
                 uiState.isLoading -> {
-                    Column(
+                    SectionLoading(
                         modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        CircularProgressIndicator()
-                        Text("경로 탐색 중...", style = MaterialTheme.typography.bodyMedium)
-                    }
+                        label = "경로 탐색 중..."
+                    )
                 }
 
                 uiState.errorMessage != null -> {
-                    Column(
+                    ErrorStateText(
+                        text = uiState.errorMessage!!,
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = uiState.errorMessage!!,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Button(onClick = viewModel::retry) { Text("다시 시도") }
-                    }
+                        onRetry = viewModel::retry
+                    )
                 }
 
                 uiState.routes.isEmpty() -> {
-                    Text(
+                    EmptyStateText(
                         text = "경로를 찾을 수 없습니다.",
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyLarge
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
                     )
                 }
 
