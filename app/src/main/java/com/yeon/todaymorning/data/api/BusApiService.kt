@@ -15,7 +15,7 @@ interface BusApiService {
     @GET("stationinfo/getStationByUid")
     suspend fun getArrivalByStationId(
         @Query("arsId") arsId: String,
-        @Query("ServiceKey") serviceKey: String,
+        @Query("serviceKey") serviceKey: String,
         @Query("resultType") resultType: String = "json"
     ): BusArrivalResponse
 
@@ -28,7 +28,7 @@ interface BusApiService {
         @Query("tmX") tmX: String,       // 경도(WGS84)
         @Query("tmY") tmY: String,       // 위도(WGS84)
         @Query("radius") radius: String, // 반경(m)
-        @Query("ServiceKey") serviceKey: String,
+        @Query("serviceKey") serviceKey: String,
         @Query("resultType") resultType: String = "json"
     ): StationByPosResponse
 
@@ -39,7 +39,7 @@ interface BusApiService {
     @GET("stationinfo/getStationByName")
     suspend fun getStationByName(
         @Query("stSrch") keyword: String,
-        @Query("ServiceKey") serviceKey: String,
+        @Query("serviceKey") serviceKey: String,
         @Query("resultType") resultType: String = "json"
     ): StationByNameResponse
 }
