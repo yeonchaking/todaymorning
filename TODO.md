@@ -58,7 +58,7 @@
 
 > 기능/UI와 별개로, 없으면 업로드 자체가 막히는 항목.
 
-- [ ] **릴리즈 서명 keystore** 생성 + `isMinifyEnabled`/난독화 확인.
+- [x] ~~**릴리즈 서명 keystore** 생성 + `isMinifyEnabled`/난독화 확인~~ — 해결(2026-07-12). `upload-keystore.jks`(alias `release`) 생성 + `build.gradle.kts` signingConfig(keystore.properties 기반, 없으면 서명 생략 fallback) + `.gitignore` 키 파일 제외. minify는 기존 설정 온전함 확인, 서명 릴리즈 APK 빌드 성공. 상세는 `구글 플레이 콘솔 업로드 준비(오늘도출근).md` 2번.
 - [ ] **개인정보처리방침 URL** — 알람·위치 권한 사용 시 필수.
 - [ ] **민감 권한 선언서** — 정확한 알람 / 전체화면 인텐트 / 포그라운드 서비스 / 위치, Play Console에서 각각 사유 제출.
 - [x] ~~**`foregroundServiceType=mediaPlayback`/`dataSync` 적절성 재검토**~~ — 결정(2026-07-06). 둘 다 **유지**하기로 함: `AlarmRingService`(mediaPlayback)는 실제로 알람음을 재생하므로 정의에 부합, `MissionService`(dataSync)도 "서버에서 주기적으로 데이터를 가져오는" 공식 용도와 일치하고 Android 15의 하루 6시간 제한도 출퇴근 미션 실사용 패턴(하루 수십 분)에 문제없음. 코드 변경 없음 — Play Console 제출 시 사유 문구만 명확히 쓰면 됨(초안은 `구글 플레이 콘솔 업로드 준비(오늘도출근).md` 참고).

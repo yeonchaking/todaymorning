@@ -11,10 +11,10 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.yeon.todaymorning.R
-import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
+// import com.yeon.todaymorning.data.datastore.UserSettingsDataStore  // 1.0 릴리즈: 플로팅 위젯 비활성화
 import com.yeon.todaymorning.domain.model.TransitArrival
 import com.yeon.todaymorning.mission.MissionEngine
-import com.yeon.todaymorning.mission.MissionOverlay
+// import com.yeon.todaymorning.mission.MissionOverlay  // 1.0 릴리즈: 플로팅 위젯 비활성화
 import com.yeon.todaymorning.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -40,16 +40,18 @@ import javax.inject.Inject
 class MissionService : Service() {
 
     @Inject lateinit var engine: MissionEngine
-    @Inject lateinit var dataStore: UserSettingsDataStore
+    // 1.0 릴리즈: 플로팅 위젯 비활성화 — watchWidgetFlag 전용이었음 (P2 재활성화 시 해제)
+    // @Inject lateinit var dataStore: UserSettingsDataStore
 
     private val scope = CoroutineScope(SupervisorJob())
     private var watchJob: Job? = null
     private var uiJob: Job? = null
-    private var flagJob: Job? = null
 
-    private val overlay by lazy { MissionOverlay(this) }
-    @Volatile private var widgetEnabled = true
-    @Volatile private var widgetOpacity = 90
+    // 1.0 릴리즈: 플로팅 위젯 비활성화 (P2 재활성화 시 해제 — Manifest 권한도 함께 복원할 것)
+    // private var flagJob: Job? = null
+    // private val overlay by lazy { MissionOverlay(this) }
+    // @Volatile private var widgetEnabled = true
+    // @Volatile private var widgetOpacity = 90
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -61,7 +63,7 @@ class MissionService : Service() {
         startForegroundCompat()
         engine.start()
         watchFinished()
-        watchWidgetFlag()
+        // watchWidgetFlag()  // 1.0 릴리즈: 플로팅 위젯 비활성화
         watchUi()
         return START_STICKY
     }
@@ -75,16 +77,17 @@ class MissionService : Service() {
         }
     }
 
-    /** 미션 화면 토글(DataStore)을 구독해 위젯 표시 여부를 실시간 반영. */
-    private fun watchWidgetFlag() {
-        if (flagJob != null) return
-        flagJob = scope.launch {
-            dataStore.userSettings.collectLatest {
-                widgetEnabled = it.floatingWidgetEnabled
-                widgetOpacity = it.floatingWidgetOpacity
-            }
-        }
-    }
+    // 1.0 릴리즈: 플로팅 위젯 비활성화 (P2 재활성화 시 해제)
+    // /** 미션 화면 토글(DataStore)을 구독해 위젯 표시 여부를 실시간 반영. */
+    // private fun watchWidgetFlag() {
+    //     if (flagJob != null) return
+    //     flagJob = scope.launch {
+    //         dataStore.userSettings.collectLatest {
+    //             widgetEnabled = it.floatingWidgetEnabled
+    //             widgetOpacity = it.floatingWidgetOpacity
+    //         }
+    //     }
+    // }
 
     /**
      * 알림 + 플로팅 위젯을 주기적으로 다시 그린다 — 엔진 현재값을 직접 읽어 emission 타이밍에
@@ -98,15 +101,16 @@ class MissionService : Service() {
             while (true) {
                 val remaining = engine.remainingSeconds.value
                 val arrivals = engine.arrivals.value
-                val busText = nextBusText(arrivals)
 
-                // 플로팅 위젯: 토글 ON + 권한 있을 때만 표시.
-                if (widgetEnabled && overlay.canDraw()) {
-                    if (!overlay.isShown) overlay.show()
-                    overlay.update(formatRemaining(remaining), busText, widgetOpacity)
-                } else if (overlay.isShown) {
-                    overlay.hide()
-                }
+                // 1.0 릴리즈: 플로팅 위젯 비활성화 (P2 재활성화 시 해제)
+                // val busText = nextBusText(arrivals)
+                // // 플로팅 위젯: 토글 ON + 권한 있을 때만 표시.
+                // if (widgetEnabled && overlay.canDraw()) {
+                //     if (!overlay.isShown) overlay.show()
+                //     overlay.update(formatRemaining(remaining), busText, widgetOpacity)
+                // } else if (overlay.isShown) {
+                //     overlay.hide()
+                // }
 
                 // 알림은 3초마다 갱신(과도한 notify 방지).
                 if (tick % 3 == 0) {
@@ -123,8 +127,8 @@ class MissionService : Service() {
         engine.stop()
         watchJob?.cancel(); watchJob = null
         uiJob?.cancel(); uiJob = null
-        flagJob?.cancel(); flagJob = null
-        overlay.hide()
+        // flagJob?.cancel(); flagJob = null  // 1.0 릴리즈: 플로팅 위젯 비활성화
+        // overlay.hide()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -133,18 +137,19 @@ class MissionService : Service() {
         super.onDestroy()
         watchJob?.cancel(); watchJob = null
         uiJob?.cancel(); uiJob = null
-        flagJob?.cancel(); flagJob = null
-        overlay.hide()
+        // flagJob?.cancel(); flagJob = null  // 1.0 릴리즈: 플로팅 위젯 비활성화
+        // overlay.hide()
     }
 
-    /** 남은초 → "12:34" / "1:02:03". 음수면 0 처리. */
-    private fun formatRemaining(remainingSeconds: Long): String {
-        val s = remainingSeconds.coerceAtLeast(0)
-        val h = s / 3600
-        val m = (s % 3600) / 60
-        val sec = s % 60
-        return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
-    }
+    // 1.0 릴리즈: 플로팅 위젯 비활성화 — 위젯 표시 전용 헬퍼 (P2 재활성화 시 해제)
+    // /** 남은초 → "12:34" / "1:02:03". 음수면 0 처리. */
+    // private fun formatRemaining(remainingSeconds: Long): String {
+    //     val s = remainingSeconds.coerceAtLeast(0)
+    //     val h = s / 3600
+    //     val m = (s % 3600) / 60
+    //     val sec = s % 60
+    //     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
+    // }
 
     private fun startForegroundCompat() {
         val notification = buildNotification(emptyList(), engine.remainingSeconds.value)
@@ -214,11 +219,12 @@ class MissionService : Service() {
         }
     }
 
-    /** 버스 라인들을 줄바꿈으로 합친 표시용 텍스트. 없으면 안내 문구. */
-    private fun nextBusText(arrivals: List<TransitArrival>): String {
-        val lines = nextBusLines(arrivals)
-        return if (lines.isEmpty()) "도착 정보를 불러오는 중…" else lines.joinToString("\n")
-    }
+    // 1.0 릴리즈: 플로팅 위젯 비활성화 — 위젯 표시 전용 헬퍼 (P2 재활성화 시 해제)
+    // /** 버스 라인들을 줄바꿈으로 합친 표시용 텍스트. 없으면 안내 문구. */
+    // private fun nextBusText(arrivals: List<TransitArrival>): String {
+    //     val lines = nextBusLines(arrivals)
+    //     return if (lines.isEmpty()) "도착 정보를 불러오는 중…" else lines.joinToString("\n")
+    // }
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

@@ -43,15 +43,16 @@ fun TimeAttackScreen(
     val refreshCountdown by viewModel.refreshCountdown.collectAsState()
     val c = AppTheme.colors
 
-    // 플로팅 위젯: 토글 상태는 settings 에서, 오버레이 권한은 주기적으로 재확인(설정 다녀온 뒤 반영).
-    val context = LocalContext.current
-    var canOverlay by remember { mutableStateOf(android.provider.Settings.canDrawOverlays(context)) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            canOverlay = android.provider.Settings.canDrawOverlays(context)
-            kotlinx.coroutines.delay(1500)
-        }
-    }
+    // 1.0 릴리즈: 플로팅 위젯 비활성화 (P2 재활성화 시 해제 — Manifest 권한도 함께 복원할 것)
+    // // 플로팅 위젯: 토글 상태는 settings 에서, 오버레이 권한은 주기적으로 재확인(설정 다녀온 뒤 반영).
+    // val context = LocalContext.current
+    // var canOverlay by remember { mutableStateOf(android.provider.Settings.canDrawOverlays(context)) }
+    // LaunchedEffect(Unit) {
+    //     while (true) {
+    //         canOverlay = android.provider.Settings.canDrawOverlays(context)
+    //         kotlinx.coroutines.delay(1500)
+    //     }
+    // }
 
     LaunchedEffect(missionState) {
         if (missionState == MissionState.Success || missionState == MissionState.Failed) {
@@ -178,69 +179,70 @@ fun TimeAttackScreen(
                 }
             }
 
-            // 플로팅 위젯 토글 — 미션 중 다른 앱 위에 작은 위젯 표시 on/off
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surface).padding(horizontal = 16.dp, vertical = 11.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text("🪟", fontSize = 21.sp)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("플로팅 위젯", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.on)
-                        Text(
-                            text = when {
-                                !settings.floatingWidgetEnabled -> "꺼짐"
-                                !canOverlay -> "권한 필요 · 눌러서 허용"
-                                else -> "화면 위에 미션 표시 중"
-                            },
-                            fontSize = 12.5.sp,
-                            color = if (settings.floatingWidgetEnabled && !canOverlay) c.danger else c.onVar,
-                            modifier = Modifier.clickable(enabled = settings.floatingWidgetEnabled && !canOverlay) {
-                                val intent = android.content.Intent(
-                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    android.net.Uri.parse("package:${context.packageName}")
-                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            }
-                        )
-                    }
-                    Switch(
-                        checked = settings.floatingWidgetEnabled,
-                        onCheckedChange = { on ->
-                            viewModel.setFloatingWidget(on)
-                            if (on && !canOverlay) {
-                                val intent = android.content.Intent(
-                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    android.net.Uri.parse("package:${context.packageName}")
-                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            }
-                        }
-                    )
-                }
-
-                // 투명도 슬라이더 — 위젯 켜졌을 때만
-                if (settings.floatingWidgetEnabled) {
-                    var opacityLocal by remember(settings.floatingWidgetOpacity) {
-                        mutableFloatStateOf(settings.floatingWidgetOpacity.toFloat())
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("투명도", fontSize = 12.5.sp, color = c.onVar)
-                        Slider(
-                            value = opacityLocal,
-                            onValueChange = { opacityLocal = it },
-                            onValueChangeFinished = { viewModel.setFloatingWidgetOpacity(opacityLocal.toInt()) },
-                            valueRange = 30f..100f,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text("${opacityLocal.toInt()}%", fontSize = 12.5.sp, color = c.on, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+            // 1.0 릴리즈: 플로팅 위젯 비활성화 (P2 재활성화 시 해제)
+            // // 플로팅 위젯 토글 — 미션 중 다른 앱 위에 작은 위젯 표시 on/off
+            // Column(
+            //     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surface).padding(horizontal = 16.dp, vertical = 11.dp)
+            // ) {
+            //     Row(
+            //         modifier = Modifier.fillMaxWidth(),
+            //         verticalAlignment = Alignment.CenterVertically,
+            //         horizontalArrangement = Arrangement.spacedBy(12.dp)
+            //     ) {
+            //         Text("🪟", fontSize = 21.sp)
+            //         Column(modifier = Modifier.weight(1f)) {
+            //             Text("플로팅 위젯", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.on)
+            //             Text(
+            //                 text = when {
+            //                     !settings.floatingWidgetEnabled -> "꺼짐"
+            //                     !canOverlay -> "권한 필요 · 눌러서 허용"
+            //                     else -> "화면 위에 미션 표시 중"
+            //                 },
+            //                 fontSize = 12.5.sp,
+            //                 color = if (settings.floatingWidgetEnabled && !canOverlay) c.danger else c.onVar,
+            //                 modifier = Modifier.clickable(enabled = settings.floatingWidgetEnabled && !canOverlay) {
+            //                     val intent = android.content.Intent(
+            //                         android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            //                         android.net.Uri.parse("package:${context.packageName}")
+            //                     ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            //                     context.startActivity(intent)
+            //                 }
+            //             )
+            //         }
+            //         Switch(
+            //             checked = settings.floatingWidgetEnabled,
+            //             onCheckedChange = { on ->
+            //                 viewModel.setFloatingWidget(on)
+            //                 if (on && !canOverlay) {
+            //                     val intent = android.content.Intent(
+            //                         android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            //                         android.net.Uri.parse("package:${context.packageName}")
+            //                     ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            //                     context.startActivity(intent)
+            //                 }
+            //             }
+            //         )
+            //     }
+            //
+            //     // 투명도 슬라이더 — 위젯 켜졌을 때만
+            //     if (settings.floatingWidgetEnabled) {
+            //         var opacityLocal by remember(settings.floatingWidgetOpacity) {
+            //             mutableFloatStateOf(settings.floatingWidgetOpacity.toFloat())
+            //         }
+            //         Spacer(Modifier.height(6.dp))
+            //         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            //             Text("투명도", fontSize = 12.5.sp, color = c.onVar)
+            //             Slider(
+            //                 value = opacityLocal,
+            //                 onValueChange = { opacityLocal = it },
+            //                 onValueChangeFinished = { viewModel.setFloatingWidgetOpacity(opacityLocal.toInt()) },
+            //                 valueRange = 30f..100f,
+            //                 modifier = Modifier.weight(1f)
+            //             )
+            //             Text("${opacityLocal.toInt()}%", fontSize = 12.5.sp, color = c.on, fontWeight = FontWeight.Bold)
+            //         }
+            //     }
+            // }
 
             // 새로고침 행
             Row(

@@ -1,5 +1,10 @@
 package com.yeon.todaymorning.mission
 
+// 1.0 릴리즈: 플로팅 위젯 비활성화 — 파일 전체 주석처리 (2026-07-12).
+// P2 재활성화 시: 아래 블록 주석 해제 + Manifest SYSTEM_ALERT_WINDOW 권한 복원
+// + MissionService/TimeAttackScreen 의 "플로팅 위젯 비활성화" 주석들 해제.
+// 재도입 시 "우리 앱이 전면일 때 오버레이 숨기기"(TODO P2) 함께 처리할 것.
+/*
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -144,3 +149,4 @@ class MissionOverlay(private val context: Context) {
 
     private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
 }
+*/
