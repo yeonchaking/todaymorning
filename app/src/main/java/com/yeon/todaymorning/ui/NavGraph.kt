@@ -12,6 +12,7 @@ import androidx.navigation.navArgument
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.ui.busselect.BusSelectScreen
 import com.yeon.todaymorning.ui.locationpicker.LocationPickerScreen
+import com.yeon.todaymorning.ui.onboarding.IntroScreen
 import com.yeon.todaymorning.ui.onboarding.PermissionOnboardingScreen
 import com.yeon.todaymorning.ui.onboarding.allOnboardingPermissionsGranted
 import com.yeon.todaymorning.ui.result.MissionResultScreen
@@ -21,7 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 
 object Routes {
-    const val ONBOARDING = "onboarding"
+    const val INTRO = "intro"            // 첫 실행 1회 앱 소개
+    const val ONBOARDING = "onboarding"  // 권한 게이트
     const val MAIN = "main"
     const val SETTINGS = "settings"
     const val HOME_PICKER = "home_picker"
@@ -38,7 +40,8 @@ object Routes {
 fun NavGraph(
     navController: NavHostController,
     fromAlarm: Boolean = false,
-    onAlarmConsumed: () -> Unit = {}
+    onAlarmConsumed: () -> Unit = {},
+    showIntro: Boolean = false
 ) {
     LaunchedEffect(fromAlarm) {
         if (fromAlarm) {
@@ -50,18 +53,37 @@ fun NavGraph(
         }
     }
 
-    // 알람으로 열린 경우는 기존 흐름을 그대로 존중해 온보딩으로 가로채지 않는다.
-    // 그 외 일반 실행이면 앱을 열 때마다(프로세스 재시작 시) 권한 3종을 다시 평가해서
-    // 하나라도 없으면 온보딩부터 시작한다(정확한 알람·전체화면 인텐트·알림 — 하드 게이트).
+    // 시작 화면 우선순위 (2026-07-12 소개 온보딩 추가):
+    //  1) 알람으로 열림 → MAIN (소개/권한이 미션을 가로막으면 안 됨 — 기존 흐름 유지)
+    //  2) 첫 실행(hasSeenIntro=false, MainActivity가 스플래시 중에 읽어 전달) → INTRO
+    //  3) 권한 3종(정확한 알람·전체화면 인텐트·알림) 미비 → ONBOARDING (하드 게이트, 매 실행 재평가)
+    //  4) 그 외 → MAIN
     val context = LocalContext.current
     val startDestination = remember {
-        if (fromAlarm || allOnboardingPermissionsGranted(context)) Routes.MAIN else Routes.ONBOARDING
+        when {
+            fromAlarm -> Routes.MAIN
+            showIntro -> Routes.INTRO
+            !allOnboardingPermissionsGranted(context) -> Routes.ONBOARDING
+            else -> Routes.MAIN
+        }
     }
 
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable(Routes.INTRO) {
+            IntroScreen(
+                onFinish = {
+                    // 소개 완료 → 권한이 이미 다 있으면 메인, 아니면 권한 게이트로.
+                    val next = if (allOnboardingPermissionsGranted(context)) Routes.MAIN else Routes.ONBOARDING
+                    navController.navigate(next) {
+                        popUpTo(Routes.INTRO) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(Routes.ONBOARDING) {
             PermissionOnboardingScreen(
                 onAllGranted = {

@@ -60,6 +60,7 @@ class UserSettingsDataStore(private val context: Context) {
         val MISSION_ROUTES = stringPreferencesKey("mission_routes")  // JSON List<MissionRoute>
 
         val IS_DEV_MODE = booleanPreferencesKey("is_dev_mode")  // 히든 개발자모드 on/off
+        val HAS_SEEN_INTRO = booleanPreferencesKey("has_seen_intro")  // 첫 실행 소개(온보딩) 완료 여부
     }
 
     val userSettings: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -127,6 +128,21 @@ class UserSettingsDataStore(private val context: Context) {
             prefs[MISSION_STOP_NAME] = settings.missionStopName
             prefs[MISSION_ROUTES] = gson.toJson(settings.missionRoutes)
             prefs[IS_DEV_MODE] = settings.isDevMode
+        }
+    }
+
+    /**
+     * 첫 실행 소개 화면(IntroScreen)을 봤는지 여부. UserSettings 모델에 넣지 않은 이유:
+     * 사용자 '설정'이 아니라 앱 1회성 상태라, 설정 저장/복원 흐름과 섞이지 않게 분리해 둠.
+     */
+    val hasSeenIntro: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[HAS_SEEN_INTRO] ?: false
+    }
+
+    /** 소개 화면 완료 표시 — IntroScreen 마지막 장 "시작하기"/"건너뛰기" 시 호출. */
+    suspend fun saveHasSeenIntro() {
+        context.dataStore.edit { prefs ->
+            prefs[HAS_SEEN_INTRO] = true
         }
     }
 
