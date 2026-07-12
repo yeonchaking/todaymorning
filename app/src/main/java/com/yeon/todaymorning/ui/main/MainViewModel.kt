@@ -10,7 +10,9 @@ import com.yeon.todaymorning.alarm.AlarmScheduler
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.data.repository.MissionRepository
+import com.yeon.todaymorning.data.repository.TransitException
 import com.yeon.todaymorning.data.repository.TransitRepository
+import com.yeon.todaymorning.data.repository.toUserMessage
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.TransitArrival
 import com.yeon.todaymorning.domain.model.UserSettings
@@ -83,30 +85,44 @@ class MainViewModel @Inject constructor(
                 }
 
                 val results = mutableListOf<TransitArrival>()
+                var endedCount = 0
+                var waitingCount = 0
                 when (s.missionTransitType) {
                     MissionTransitType.BUS ->
                         s.missionRoutes.forEach { route ->
-                            results += transitRepository.getBusArrivals(s.missionStopId, route.routeId)
+                            val r = transitRepository.getBusArrivals(s.missionStopId, route.routeId)
+                            results += r.arrivals
+                            endedCount += r.endedCount
+                            waitingCount += r.waitingCount
                         }
                     MissionTransitType.SUBWAY ->
                         s.missionRoutes.forEach { route ->
-                            results += transitRepository.getSubwayArrivals(s.missionStopId, route.routeId)
+                            val r = transitRepository.getSubwayArrivals(s.missionStopId, route.routeId)
+                            results += r.arrivals
+                            endedCount += r.endedCount
+                            waitingCount += r.waitingCount
                         }
                     MissionTransitType.NONE -> Unit
                 }
 
                 val sorted = results.sortedBy { it.arrivalSeconds }
+                // 0건 원인별 안내 — MissionEngine.fetchArrivals 와 동일 기준(2026-07-12).
                 _arrivalDialog.value = ArrivalDialogState(
                     isOpen = true,
                     arrivals = sorted,
-                    errorMessage = if (sorted.isEmpty())
-                        "도착 정보가 없습니다." else null
+                    errorMessage = when {
+                        sorted.isNotEmpty() -> null
+                        endedCount > 0 -> "지금은 운행 시간이 아니에요. (운행 종료 또는 첫차 전)"
+                        waitingCount > 0 -> "차량이 아직 출발 전이에요. 잠시 후 다시 확인해 주세요."
+                        else -> "지금 도착 예정인 차량이 없어요."
+                    }
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: TransitException) {
+                _arrivalDialog.value = ArrivalDialogState(isOpen = true, errorMessage = e.userMessage)
             } catch (e: Exception) {
-                _arrivalDialog.value = ArrivalDialogState(
-                    isOpen = true,
-                    errorMessage = "네트워크 오류: ${e.message}"
-                )
+                _arrivalDialog.value = ArrivalDialogState(isOpen = true, errorMessage = e.toUserMessage())
             }
         }
     }

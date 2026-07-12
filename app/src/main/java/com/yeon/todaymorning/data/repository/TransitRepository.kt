@@ -10,6 +10,20 @@ import com.yeon.todaymorning.domain.model.TransitArrival
 import com.yeon.todaymorning.domain.model.TransitType
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+
+/**
+ * 도착 조회 결과. 도착 예정 차편 리스트에 더해, `toTransitArrival()`이 걸러내던
+ * "운행종료"/"출발대기" 메시지의 **개수**를 함께 올린다 — 호출부가 "전부 운행종료라 0건"과
+ * "그냥 아직 안 옴(정상 0건)"을 구분해 다른 안내를 띄울 수 있게 하기 위함(2026-07-12).
+ */
+data class ArrivalResult(
+    val arrivals: List<TransitArrival>,
+    /** "운행종료" 메시지로 걸러진 차편 수 — 막차 이후/첫차 전 신호. */
+    val endedCount: Int = 0,
+    /** "출발대기" 메시지로 걸러진 차편 수 — 차량이 기점 출발 전 신호. */
+    val waitingCount: Int = 0
+)
 
 @Singleton
 class TransitRepository @Inject constructor(
@@ -17,24 +31,48 @@ class TransitRepository @Inject constructor(
     private val subwayApiService: SubwayApiService
 ) {
 
-    suspend fun getBusArrivals(arsId: String, busRouteId: String): List<TransitArrival> {
+    /**
+     * 정류장+노선 도착 조회. 실패 시 [TransitException]을 던진다(더 이상 emptyList 로 삼키지 않음).
+     * 0건(정상)과 오류를 호출부가 구분할 수 있어야 하기 때문 — 상세는 ApiErrorMapper.kt 주석.
+     */
+    suspend fun getBusArrivals(arsId: String, busRouteId: String): ArrivalResult {
         val apiKey = BuildConfig.BUS_API_KEY
-        if (apiKey.isBlank() || arsId.isBlank()) return emptyList()
+        if (apiKey.isBlank()) throw TransitException("버스 API 키가 설정되지 않았어요. (개발 설정 확인)")
+        if (arsId.isBlank()) return ArrivalResult(emptyList())
 
         return try {
             val response = busApiService.getArrivalByStationId(arsId, apiKey)
             val items = response.msgBody?.itemList ?: emptyList()
 
+            val arrivals = mutableListOf<TransitArrival>()
+            var ended = 0
+            var waiting = 0
             items
                 .filter { busRouteId.isBlank() || it.busRouteId == busRouteId }
-                .flatMap { item ->
-                    listOfNotNull(
-                        item.arrmsg1.toTransitArrival(item.rtNm, item.adirection),
-                        item.arrmsg2.toTransitArrival(item.rtNm, item.adirection)
-                    )
+                .forEach { item ->
+                    for (msg in listOf(item.arrmsg1, item.arrmsg2)) {
+                        when {
+                            msg.isBlank() -> Unit
+                            msg.contains("운행종료") -> ended++
+                            msg.contains("출발대기") -> waiting++
+                            else -> arrivals += TransitArrival(
+                                type = TransitType.BUS,
+                                routeName = item.rtNm,
+                                destination = item.adirection,
+                                arrivalSeconds = parseArrivalSeconds(msg),
+                                arrivalMessage = msg
+                            )
+                        }
+                    }
                 }
+            ArrivalResult(arrivals, endedCount = ended, waitingCount = waiting)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TransitException) {
+            throw e
         } catch (e: Exception) {
-            emptyList()
+            Log.e("TransitRepo", "getBusArrivals 실패 (arsId=$arsId): ${e.message}", e)
+            throw TransitException(e.toUserMessage(), e)
         }
     }
 
@@ -116,44 +154,49 @@ class TransitRepository @Inject constructor(
         }
     }
 
-    suspend fun getSubwayArrivals(stationName: String, lineId: String): List<SubwayArrival> {
+    /** 지하철 도착 조회. 실패 시 [TransitException] — 버스와 동일한 정책(위 getBusArrivals 참고). */
+    suspend fun getSubwayArrivals(stationName: String, lineId: String): ArrivalResult {
         val apiKey = BuildConfig.SUBWAY_API_KEY
         val queryName = normalizeStationName(stationName)
-        if (apiKey.isBlank() || queryName.isBlank()) return emptyList()
+        if (apiKey.isBlank()) throw TransitException("지하철 API 키가 설정되지 않았어요. (개발 설정 확인)")
+        if (queryName.isBlank()) return ArrivalResult(emptyList())
 
         return try {
             val response = subwayApiService.getArrivalByStation(apiKey, queryName)
             val items = response.realtimeArrivalList ?: emptyList()
 
-            items
+            var ended = 0
+            val arrivals = items
                 .filter { lineId.isBlank() || it.subwayId == lineId }
                 .take(4)
-                .map { item ->
+                .mapNotNull { item ->
+                    val msg = item.arvlMsg2.ifBlank { item.arvlMsg3 }
+                    if (msg.contains("운행종료")) {
+                        ended++
+                        return@mapNotNull null
+                    }
                     TransitArrival(
                         type = TransitType.SUBWAY,
                         routeName = item.subwayId.toLineName(),
                         destination = item.trainLineNm,
                         arrivalSeconds = item.barvlDt.toIntOrNull() ?: -1,
-                        arrivalMessage = item.arvlMsg2.ifBlank { item.arvlMsg3 }
+                        arrivalMessage = msg
                     )
                 }
+            ArrivalResult(arrivals, endedCount = ended)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TransitException) {
+            throw e
         } catch (e: Exception) {
-            emptyList()
+            Log.e("TransitRepo", "getSubwayArrivals 실패 (station=$queryName): ${e.message}", e)
+            throw TransitException(e.toUserMessage(), e)
         }
     }
 
-    // "3분후[4번째 전]", "곧 도착", "운행종료" 등 파싱
-    private fun String.toTransitArrival(routeName: String, destination: String): TransitArrival? {
-        if (isBlank() || contains("운행종료") || contains("출발대기")) return null
-        return TransitArrival(
-            type = TransitType.BUS,
-            routeName = routeName,
-            destination = destination,
-            arrivalSeconds = parseArrivalSeconds(this),
-            arrivalMessage = this
-        )
-    }
-
+    // "3분후[4번째 전]", "곧 도착" 등 도착 메시지 → 초 단위 파싱
+    // (구 toTransitArrival 헬퍼는 "운행종료"/"출발대기"를 조용히 버렸음 — 이제 getBusArrivals
+    //  본문에서 개수를 세어 ArrivalResult 로 올린다. 2026-07-12)
     private fun parseArrivalSeconds(msg: String): Int = when {
         msg.contains("곧 도착") || msg.startsWith("도착") -> 0
         msg.contains("분") -> {
@@ -191,6 +234,3 @@ class TransitRepository @Inject constructor(
         else -> this
     }
 }
-
-// SubwayArrival은 타입 충돌 방지를 위한 별칭 — 실제로는 TransitArrival 반환
-private typealias SubwayArrival = TransitArrival

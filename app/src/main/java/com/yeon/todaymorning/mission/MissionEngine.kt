@@ -12,7 +12,9 @@ import com.yeon.todaymorning.alarm.TtsManager
 import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.data.db.MissionRecord
 import com.yeon.todaymorning.data.repository.MissionRepository
+import com.yeon.todaymorning.data.repository.TransitException
 import com.yeon.todaymorning.data.repository.TransitRepository
+import com.yeon.todaymorning.data.repository.toUserMessage
 import com.yeon.todaymorning.domain.model.MissionState
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.TransitArrival
@@ -115,12 +117,23 @@ class MissionEngine @Inject constructor(
     private fun startCountdown() {
         countdownJob = scope.launch {
             val s = dataStore.userSettings.first()
-            val target = Calendar.getInstance().apply {
+            var target = Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, s.targetHour)
                 set(Calendar.MINUTE, s.targetMinute)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
+
+            // 자정 넘김 롤오버(2026-07-12): 위 계산은 항상 "오늘 날짜" 기준이라, 알람 23:50 →
+            // 목표 00:10 같은 심야 조합이면 target 이 약 -24시간 과거로 잡혀 화면이 열리자마자
+            // "시간이 지났어요"가 됐다. 목표가 지금보다 임계값 이상 과거면 "오늘 이미 지난 것"이
+            // 아니라 "자정 넘겨 내일 도래"로 보고 하루를 더한다. 임계값 3시간인 이유: 알람→목표
+            // 간격은 보통 1~2시간이라, 이보다 작게 잡으면 "목표 직후 재진입해 수동 성공/실패를
+            // 고르는" 의도된 케이스까지 내일로 밀어버린다. (AlarmScheduler.nextDailyTrigger 는
+            // 이미 같은 롤오버 처리가 있음 — 이 계산만 빠져 있었다.)
+            if (target < System.currentTimeMillis() - MIDNIGHT_ROLLOVER_THRESHOLD_MS) {
+                target += 24 * 60 * 60 * 1000L
+            }
 
             while (true) {
                 val now = System.currentTimeMillis()
@@ -163,6 +176,8 @@ class MissionEngine @Inject constructor(
             try {
                 val s = dataStore.userSettings.first()
                 val results = mutableListOf<TransitArrival>()
+                var endedCount = 0
+                var waitingCount = 0
 
                 if (!s.hasMissionTarget) {
                     _errorMessage.value = "설정에서 출근 경로를 먼저 탐색해 주세요."
@@ -172,11 +187,17 @@ class MissionEngine @Inject constructor(
                 when (s.missionTransitType) {
                     MissionTransitType.BUS ->
                         s.missionRoutes.forEach { route ->
-                            results += transitRepository.getBusArrivals(s.missionStopId, route.routeId)
+                            val r = transitRepository.getBusArrivals(s.missionStopId, route.routeId)
+                            results += r.arrivals
+                            endedCount += r.endedCount
+                            waitingCount += r.waitingCount
                         }
                     MissionTransitType.SUBWAY ->
                         s.missionRoutes.forEach { route ->
-                            results += transitRepository.getSubwayArrivals(s.missionStopId, route.routeId)
+                            val r = transitRepository.getSubwayArrivals(s.missionStopId, route.routeId)
+                            results += r.arrivals
+                            endedCount += r.endedCount
+                            waitingCount += r.waitingCount
                         }
                     MissionTransitType.NONE -> {
                         _errorMessage.value = "설정에서 출근 경로를 먼저 탐색해 주세요."
@@ -187,11 +208,21 @@ class MissionEngine @Inject constructor(
                 _arrivals.value = results.sortedBy { it.arrivalSeconds }
                 maybeAnnounce(s)
 
+                // 0건일 때 원인별 안내(2026-07-12) — 예전엔 전부 "도착 정보가 없습니다"였다.
+                // 네트워크/서버/키 오류는 여기 오지 않고 아래 catch(TransitException)로 빠진다.
                 if (results.isEmpty()) {
-                    _errorMessage.value = "도착 정보가 없습니다. (운행 종료 또는 API 키 미설정)"
+                    _errorMessage.value = when {
+                        endedCount > 0 -> "지금은 운행 시간이 아니에요. (운행 종료 또는 첫차 전)"
+                        waitingCount > 0 -> "차량이 아직 출발 전이에요. 잠시 후 다시 확인해 주세요."
+                        else -> "지금 도착 예정인 차량이 없어요."
+                    }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: TransitException) {
+                _errorMessage.value = e.userMessage
             } catch (e: Exception) {
-                _errorMessage.value = "네트워크 오류: ${e.message}"
+                _errorMessage.value = e.toUserMessage()
             } finally {
                 _isLoading.value = false
             }
@@ -328,5 +359,10 @@ class MissionEngine @Inject constructor(
         pollingJob?.cancel(); pollingJob = null
         runCatching { tts?.shutdown() }
         tts = null
+    }
+
+    companion object {
+        /** 자정 넘김 판정 임계값 — startCountdown 주석 참고. */
+        private const val MIDNIGHT_ROLLOVER_THRESHOLD_MS = 3 * 60 * 60 * 1000L
     }
 }
