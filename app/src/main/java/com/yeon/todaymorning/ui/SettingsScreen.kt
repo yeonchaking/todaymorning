@@ -124,7 +124,7 @@ fun SettingsScreen(
         containerColor = c.appBg,
         topBar = {
             TopAppBar(
-                title = { Text("설정", fontWeight = FontWeight.ExtraBold) },
+                title = { Text("미션 설정", fontWeight = FontWeight.ExtraBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")

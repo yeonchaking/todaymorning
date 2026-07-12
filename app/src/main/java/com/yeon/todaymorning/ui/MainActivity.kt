@@ -32,8 +32,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.lifecycleScope
 import com.yeon.todaymorning.alarm.AlarmScheduler
+import com.yeon.todaymorning.data.datastore.UserSettingsDataStore
 import com.yeon.todaymorning.data.db.MissionRecord
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.TransitArrival
 import com.yeon.todaymorning.domain.model.TransitType
@@ -54,13 +59,20 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_FROM_ALARM = "extra_from_alarm"
     }
 
+    @Inject lateinit var dataStore: UserSettingsDataStore
+
     private lateinit var alarmScheduler: AlarmScheduler  // kept for future use
     private var fromAlarm by mutableStateOf(false)
+
+    // null = DataStore 읽는 중(스플래시 유지). 첫 실행 소개(IntroScreen) 표시 여부.
+    private var showIntro by mutableStateOf<Boolean?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 스플래시 화면(Theme.Todaymorning.Splash) 설치 — super.onCreate() 이전에 호출해야 한다.
         // 로고 교체는 res/drawable/splash_icon.xml 한 파일만 바꾸면 됨(테마·코드 변경 불필요).
-        installSplashScreen()
+        // hasSeenIntro 를 읽는 동안(수 ms) 스플래시를 유지해, 소개 화면과 메인이
+        // 잘못된 순서로 잠깐 겹쳐 보이는 깜빡임을 막는다.
+        installSplashScreen().setKeepOnScreenCondition { showIntro == null }
         super.onCreate(savedInstanceState)
 
         // 권한 요청(정확한 알람·전체화면 인텐트·알림)은 전부 PermissionOnboardingScreen이 담당한다.
@@ -68,14 +80,21 @@ class MainActivity : ComponentActivity() {
         alarmScheduler = AlarmScheduler(this)
         fromAlarm = intent.getBooleanExtra(EXTRA_FROM_ALARM, false)
 
+        lifecycleScope.launch {
+            showIntro = !dataStore.hasSeenIntro.first()
+        }
+
         enableEdgeToEdge()
         setContent {
             TodayCommuteTheme {
+                // 읽기 완료 전에는 스플래시가 화면을 덮고 있음 — 빈 프레임 렌더 방지.
+                val intro = showIntro ?: return@TodayCommuteTheme
                 val navController = rememberNavController()
                 NavGraph(
                     navController = navController,
                     fromAlarm = fromAlarm,
-                    onAlarmConsumed = { fromAlarm = false }
+                    onAlarmConsumed = { fromAlarm = false },
+                    showIntro = intro
                 )
             }
         }
@@ -134,13 +153,24 @@ fun MainScreen(
             )
         }
 
-        // 오늘의 미션 카드
+        // 오늘의 미션 카드 — 탭하면 미션 설정으로 (우상단 설정 버튼 대체, 2026-07-12)
         item {
             MissionCardV2(
                 settings = settings,
                 enabled = alarmOn,
+                onClick = onNavigateToSettings,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+        }
+
+        // 미션 미설정 유도 카드 — 온보딩 직후 첫 화면에서 다음 행동을 안내 (2026-07-12)
+        if (!settings.hasMissionTarget) {
+            item {
+                MissionSetupNudgeCard(
+                    onClick = onNavigateToSettings,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
         }
 
         // 실시간 도착 CTA (미션 설정돼 있으면 알람 ON/OFF 무관하게 노출)
@@ -274,9 +304,11 @@ private fun TopHeader(onSettings: () -> Unit, onTitleTapped: () -> Unit = {}) {
                     }
                 }
             )
-            IconButton(onClick = onSettings) {
-                Icon(Icons.Default.Settings, contentDescription = "설정", tint = c.onVar)
-            }
+            // 우상단 설정 버튼 보류(2026-07-12): 미션 설정 진입은 "오늘의 미션" 카드 탭으로 이동.
+            // 이 자리는 나중에 앱 자체 설정 페이지(다크모드·음량 등)가 생기면 부활시킨다.
+            // IconButton(onClick = onSettings) {
+            //     Icon(Icons.Default.Settings, contentDescription = "설정", tint = c.onVar)
+            // }
         }
     }
 }
@@ -319,6 +351,7 @@ private fun MasterSwitchCard(
 private fun MissionCardV2(
     settings: UserSettings,
     enabled: Boolean,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val c = AppTheme.colors
@@ -335,14 +368,22 @@ private fun MissionCardV2(
         else -> "🚉"
     }
 
-    AppCard(modifier = modifier.then(if (enabled) Modifier else Modifier.alpha(0.5f)), padding = 18.dp) {
+    AppCard(
+        // clip을 clickable보다 먼저 — 리플이 카드 라운드(24dp) 밖으로 번지지 않게.
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick)
+            .then(if (enabled) Modifier else Modifier.alpha(0.5f)),
+        padding = 18.dp
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("오늘의 미션", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.primary)
-            Text(dateText, fontSize = 12.sp, color = c.onVar)
+            // 날짜 + 탭 유도 화살표 (카드 전체가 미션 설정 진입점)
+            Text("$dateText ›", fontSize = 12.sp, color = c.onVar)
         }
         Spacer(Modifier.height(16.dp))
 
@@ -427,6 +468,43 @@ private fun MissionCardV2(
                 }
             }
         }
+    }
+}
+
+/* ───────────────────── 미션 설정 유도 카드 ───────────────────── */
+
+/** 미션 미설정 상태에서만 보이는 유도 카드 — 탭하면 설정으로 이동. */
+@Composable
+private fun MissionSetupNudgeCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(c.primaryCtr)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(c.surface),
+            contentAlignment = Alignment.Center
+        ) { Text("🚏", fontSize = 21.sp) }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "출근 미션을 만들어 볼까요?",
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = c.onPrimaryCtr
+            )
+            Text(
+                text = "정류장과 버스를 고르면 준비 끝!",
+                fontSize = 12.5.sp,
+                color = c.onPrimaryCtr.copy(alpha = 0.85f)
+            )
+        }
+        Text("›", fontSize = 18.sp, color = c.onPrimaryCtr)
     }
 }
 
