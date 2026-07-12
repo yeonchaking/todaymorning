@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오늘도출근 개인정보처리방침</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; color: #1f2937; line-height: 1.7; }
+  h1 { font-size: 1.6rem; border-bottom: 2px solid #2563eb; padding-bottom: 12px; }
+  h2 { font-size: 1.15rem; margin-top: 36px; color: #1e40af; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { border: 1px solid #d1d5db; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #eff6ff; }
+  .meta { color: #6b7280; font-size: 0.9rem; }
+  .box { background: #f3f4f6; border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<h1>오늘도출근 개인정보처리방침</h1>
+<p class="meta">시행일: 2026년 7월 12일</p>
+
+<p>「오늘도출근」(이하 "본 앱")은 사용자의 개인정보를 소중히 여기며, 관련 법령을 준수합니다.
+본 방침은 본 앱이 어떤 정보를 다루고 어떻게 보호하는지 설명합니다.</p>
+
+<div class="box">
+<strong>핵심 요약</strong><br>
+본 앱은 개인정보를 수집하지 않으며, 어떠한 데이터도 외부 서버로 전송하거나 제3자에게 제공하지 않습니다.
+모든 데이터는 사용자의 기기 내부에만 저장됩니다.
+</div>
+
+<h2>1. 수집하는 개인정보</h2>
+<p>본 앱은 이름, 이메일, 전화번호, 계정 정보 등 <strong>개인을 식별할 수 있는 정보를 일절 수집하지 않습니다.</strong>
+회원가입이나 로그인 절차도 없습니다.</p>
+
+<h2>2. 기기 내부에만 저장되는 데이터</h2>
+<p>아래 데이터는 앱 기능 제공을 위해 <strong>사용자 기기 내부에만</strong> 저장되며, 외부로 전송되지 않습니다.</p>
+<table>
+  <tr><th>데이터</th><th>용도</th></tr>
+  <tr><td>알람 설정 (시각, 요일, 알람음, 진동 등)</td><td>출근 알람 제공</td></tr>
+  <tr><td>미션 설정 (선택한 버스 정류장·노선, 목표 시각)</td><td>타임어택 미션 및 실시간 도착정보 표시</td></tr>
+  <tr><td>미션 성공/실패 기록</td><td>출근 기록 통계 표시</td></tr>
+  <tr><td>앱 환경 설정 (음성 안내 여부 등)</td><td>사용자 편의 기능</td></tr>
+</table>
+<p>이 데이터는 앱을 삭제하면 함께 삭제됩니다.</p>
+
+<h2>3. 위치 정보</h2>
+<p>본 앱은 출근 경로 설정 시 지도에서 내 위치 주변의 버스 정류장을 쉽게 찾을 수 있도록
+위치 권한(<code>ACCESS_FINE_LOCATION</code>, <code>ACCESS_COARSE_LOCATION</code>)을 사용합니다.</p>
+<ul>
+  <li>위치 정보는 정류장 선택 화면에서 지도를 내 위치로 이동하는 데에만 사용됩니다.</li>
+  <li>위치 정보를 <strong>저장하지 않으며, 서버로 전송하지 않습니다.</strong></li>
+  <li>위치 권한을 거부해도 지도에서 직접 정류장을 검색·선택하여 앱을 이용할 수 있습니다.</li>
+</ul>
+
+<h2>4. 외부 API 호출</h2>
+<p>본 앱은 실시간 버스·지하철 도착정보를 표시하기 위해 공공데이터포털의 공공 API
+(서울특별시 버스도착정보, 서울교통공사 지하철 도착정보)를 호출합니다.
+이때 전송되는 정보는 <strong>사용자가 선택한 정류장·노선 식별자뿐</strong>이며,
+개인을 식별할 수 있는 정보는 포함되지 않습니다.</p>
+
+<h2>5. 앱 권한 안내</h2>
+<table>
+  <tr><th>권한</th><th>용도</th></tr>
+  <tr><td>정확한 알람 (SCHEDULE_EXACT_ALARM)</td><td>설정한 출근 알람을 정확한 시각에 울리기 위해 사용</td></tr>
+  <tr><td>전체 화면 알림 (USE_FULL_SCREEN_INTENT)</td><td>알람이 울릴 때 잠금 화면 위에 알람/미션 화면을 즉시 표시</td></tr>
+  <tr><td>포그라운드 서비스</td><td>알람음 재생 및 미션 진행 중 실시간 도착정보 갱신</td></tr>
+  <tr><td>위치</td><td>정류장 선택 화면에서 내 위치 주변 정류장 표시 (저장·전송 없음)</td></tr>
+  <tr><td>알림 (POST_NOTIFICATIONS)</td><td>알람 및 미션 진행 상태 알림 표시</td></tr>
+</table>
+
+<h2>6. 제3자 제공 및 광고</h2>
+<p>본 앱은 개인정보를 제3자에게 제공하지 않으며, 광고 SDK나 분석(Analytics) 도구를 사용하지 않습니다.</p>
+
+<h2>7. 아동의 개인정보</h2>
+<p>본 앱은 개인정보를 수집하지 않으므로 아동의 개인정보도 수집하지 않습니다.</p>
+
+<h2>8. 방침 변경</h2>
+<p>본 방침이 변경되는 경우 이 페이지를 통해 공지하며, 시행일을 갱신합니다.</p>
+
+<h2>9. 문의</h2>
+<p>개인정보처리방침에 관한 문의는 아래 이메일로 연락해 주세요.</p>
+<p><strong>개발자:</strong> Yeon<br>
+<strong>이메일:</strong> <a href="mailto:yllh325@gmail.com">yllh325@gmail.com</a></p>
+
+</body>
+</html>
