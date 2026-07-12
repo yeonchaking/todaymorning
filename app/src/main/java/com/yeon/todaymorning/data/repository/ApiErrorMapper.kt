@@ -24,7 +24,7 @@ class TransitException(
 /** Throwable → 사용자 안내 문구. */
 fun Throwable.toUserMessage(): String = when (this) {
     is TransitException -> userMessage
-    is HttpException -> "일시적인 서버 오류예요. 잠시 후 다시 시도해 주세요. (코드 ${code()})"
+    is HttpException -> "일시적인 서버 오류예요. 잠시 후 다시 시도해 주세요. (${code()})"
     is UnknownHostException,
     is SocketTimeoutException,
     is IOException -> "네트워크 연결을 확인해 주세요."

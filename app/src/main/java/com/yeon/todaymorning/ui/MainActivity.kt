@@ -418,11 +418,14 @@ private fun MissionCardV2(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = if (settings.hasMissionTarget) "설정 > 출근 경로에서 변경" else "설정에서 정류장·노선을 골라주세요",
-                    fontSize = 12.sp,
-                    color = c.onVar
-                )
+                // 미설정일 때만 안내 노출 — 설정돼 있으면 정류장 이름만 깔끔하게 (2026-07-12)
+                if (!settings.hasMissionTarget) {
+                    Text(
+                        text = "설정에서 정류장·노선을 골라주세요",
+                        fontSize = 12.sp,
+                        color = c.onVar
+                    )
+                }
             }
             if (settings.hasMissionTarget) {
                 Row(

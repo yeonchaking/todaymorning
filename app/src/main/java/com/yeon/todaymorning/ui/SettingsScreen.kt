@@ -202,20 +202,20 @@ fun SettingsScreen(
                     ) {
                         Text("⚙️", fontSize = 16.sp)
                         Spacer(Modifier.width(8.dp))
-                        Text("정류장 · 노선 다시 선택", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.primary)
+                        Text("출근 경로 선택", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.primary)
                     }
                 }
             }
 
             // ── 음성 안내 ─────────────────────────────────
             SettingsGroup("음성 안내") {
-                ToggleRow("🔊", "음성 안내 (TTS)", ttsOn) { viewModel.setTtsSettings(it, ttsTimings, ttsLead) }
+                ToggleRow("🔊", "음성 안내", ttsOn) { viewModel.setTtsSettings(it, ttsTimings, ttsLead) }
                 RowDivider()
                 Column(modifier = Modifier.padding(vertical = 14.dp, horizontal = 2.dp)) {
                     Text("미션 음성안내 시작", fontSize = 13.sp, color = c.onVar)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "목표 시각 이만큼 전부터 음성안내가 켜져요 (화면 꺼져 있어도)",
+                        "목표 시각 이만큼 전부터 음성안내가 켜져요",
                         fontSize = 11.5.sp, color = c.onVar
                     )
                     Spacer(Modifier.height(10.dp))
@@ -227,7 +227,7 @@ fun SettingsScreen(
                 }
                 RowDivider()
                 Column(modifier = Modifier.padding(vertical = 14.dp, horizontal = 2.dp)) {
-                    Text("차편별 안내 시점", fontSize = 13.sp, color = c.onVar)
+                    Text("도착 알림 시작", fontSize = 13.sp, color = c.onVar)
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TimingChip("10분 전", 10 in ttsTimings, Modifier.weight(1f)) { toggleTtsTiming(10) }
@@ -258,7 +258,7 @@ fun SettingsScreen(
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     Text("🔔", fontSize = 19.sp)
                     Spacer(Modifier.width(9.dp))
-                    Text("저장 및 알람 등록", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = c.onPrimary)
+                    Text("알람 저장", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = c.onPrimary)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -669,7 +669,7 @@ private fun RowDivider() {
     HorizontalDivider(color = AppTheme.colors.outlineSoft)
 }
 
-/** Material3 시계 TimePicker 다이얼로그 */
+/** Material3 입력형(TimeInput) 시각 선택 다이얼로그 — 시계 다이얼 대신 숫자 직접 입력(2026-07-12 변경) */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimePickerDialog(
@@ -683,7 +683,7 @@ private fun TimePickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TimePicker(state = state) } },
+        text = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TimeInput(state = state) } },
         confirmButton = { TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("확인") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } }
     )
