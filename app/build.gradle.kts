@@ -1,3 +1,5 @@
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Properties
 
 plugins {
@@ -22,6 +24,14 @@ kotlin {
     jvmToolchain(17)
 }
 
+// 앱 버전 (버전 올릴 때 여기만 수정)
+val appVersionName = "1.1"
+
+// 빌드 산출물 파일명: todaymorning-v1.0-20260712-release.aab
+base {
+    archivesName.set("todaymorning-v$appVersionName-${SimpleDateFormat("yyyyMMdd").format(Date())}")
+}
+
 android {
     namespace = "com.yeon.todaymorning"
     compileSdk {
@@ -34,8 +44,8 @@ android {
         applicationId = "com.yeon.todaymorning"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

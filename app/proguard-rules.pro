@@ -37,6 +37,16 @@
 -keep class com.google.gson.** { *; }
 -keep class com.yeon.todaymorning.data.api.dto.** { *; }
 
+# TypeToken 익명 서브클래스의 제네릭 시그니처 보존 (R8 full-mode 대응)
+# 없으면 UserSettingsDataStore 의 TypeToken<List<MissionRoute>> 가
+# "TypeToken must be created with a type argument" 로 앱 시작 시 크래시.
+-keepattributes Signature
+-keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
+-keepclassmembers,allowobfuscation class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
 # ── Lottie ────────────────────────────────────────────────────
 -keep class com.airbnb.lottie.** { *; }
 -dontwarn com.airbnb.lottie.**
