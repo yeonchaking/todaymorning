@@ -25,7 +25,7 @@ kotlin {
 }
 
 // 앱 버전 (버전 올릴 때 여기만 수정)
-val appVersionName = "1.1"
+val appVersionName = "1.4"
 
 // 빌드 산출물 파일명: todaymorning-v1.0-20260712-release.aab
 base {
@@ -44,7 +44,7 @@ android {
         applicationId = "com.yeon.todaymorning"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
+        versionCode = 5
         versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -81,6 +81,13 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.findByName("release")
+            // 카카오 네이티브 앱 키: release 는 원본 앱 키로 오버라이드
+            // (debug 는 defaultConfig 의 테스트 앱 키를 그대로 사용)
+            buildConfigField(
+                "String",
+                "KAKAO_NATIVE_APP_KEY",
+                "\"${localProps["KAKAO_NATIVE_APP_KEY_RELEASE"] ?: ""}\""
+            )
         }
     }
 
