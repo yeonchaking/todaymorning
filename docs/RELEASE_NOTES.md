@@ -7,7 +7,7 @@
 - **미션 설정 지도가 안 뜨던 문제 수정.** 카카오맵 인증 401(MapAuthException). 릴리즈 빌드는 원본 앱 키가 아니라 테스트 앱 키(dd5f19)를 쓰고 있었고, 콘솔엔 `com.yeon.todaymorning.debug` 패키지 + 디버그 키 해시만 등록돼 있어, Play 서명된 `com.yeon.todaymorning` 빌드가 인증에 실패.
 - `build.gradle.kts`: release 빌드가 원본 앱 키(6b5f709)를 쓰도록 `KAKAO_NATIVE_APP_KEY`를 buildType별로 분리(debug=테스트 앱, release=원본 앱). `local.properties`에 `KAKAO_NATIVE_APP_KEY_RELEASE` 추가.
 - 카카오 콘솔(원본 앱)에 패키지 `com.yeon.todaymorning` + Play 앱 서명 키 해시 + 업로드 키 해시 등록.
-- `versionCode` 2→3, `versionName` 1.1→1.2.
+- `versionCode` 2→5, `versionName` 1.1→1.4 (지도 수정 내부 테스트 재업로드 과정에서 vc3·4 소진 — Play 업로드는 versionCode 중복 불가 — 최종 5로 커밋).
 
 ### 외부 (플레이스토어 콘솔 입력용)
 
