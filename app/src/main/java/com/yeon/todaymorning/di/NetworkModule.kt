@@ -20,10 +20,24 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+    // API 인증키가 로그(URL)에 노출되는 걸 막는 마스킹 로거.
+    // - 버스/기타 공공 API: serviceKey=... 쿼리 파라미터
+    // - 지하철 API: URL 경로에 키가 박힘 (.../api/subway/{key}/json/...)
+    // 로그 문자열만 치환하며 실제 요청 URL에는 전혀 영향이 없다.
+    private val serviceKeyQueryRegex = Regex("(serviceKey=)[^&\\s]+", RegexOption.IGNORE_CASE)
+    private val subwayPathKeyRegex = Regex("(/api/subway/)[^/]+(/)")
+
+    private val maskingLogger = HttpLoggingInterceptor.Logger { message ->
+        val masked = message
+            .replace(serviceKeyQueryRegex, "$1***")
+            .replace(subwayPathKeyRegex, "$1***$2")
+        HttpLoggingInterceptor.Logger.DEFAULT.log(masked)
+    }
+
     // 릴리즈 빌드에서 API 키·응답 바디가 로그캣에 그대로 찍히는 걸 막기 위해
     // BODY(전체 요청/응답 본문)는 디버그 빌드에서만, 릴리즈는 BASIC(URL·상태코드만)으로.
     private fun buildOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
-        .addInterceptor(HttpLoggingInterceptor().apply {
+        .addInterceptor(HttpLoggingInterceptor(maskingLogger).apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY
             } else {
