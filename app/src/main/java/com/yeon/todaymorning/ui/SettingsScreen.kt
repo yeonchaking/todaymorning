@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.yeon.todaymorning.alarm.AlarmSounds
 import com.yeon.todaymorning.alarm.VibrationPatterns
 import com.yeon.todaymorning.domain.model.EVERYDAY
+import com.yeon.todaymorning.domain.model.MissionTransitType
 import com.yeon.todaymorning.domain.model.WEEKDAYS
 import com.yeon.todaymorning.domain.model.WEEKEND
 import com.yeon.todaymorning.ui.theme.AppTheme
@@ -110,11 +111,16 @@ fun SettingsScreen(
     var showRepeatDialog by remember { mutableStateOf(false) }
 
     var showTimeError by remember { mutableStateOf(false) }
+    // 저장 시 필수 항목(출근 경로) 누락 안내. null = 정상.
+    var validationError by remember { mutableStateOf<String?>(null) }
     var comingSoon by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(showTimeError) {
         if (showTimeError) { snackbarHostState.showSnackbar("알람 시각은 목표 탑승 시각보다 빨라야 해요"); showTimeError = false }
+    }
+    LaunchedEffect(validationError) {
+        validationError?.let { snackbarHostState.showSnackbar(it); validationError = null }
     }
     LaunchedEffect(comingSoon) {
         if (comingSoon) { snackbarHostState.showSnackbar("준비 중인 기능이에요"); comingSoon = false }
@@ -243,6 +249,15 @@ fun SettingsScreen(
                     val alarmTotal = alarmHour * 60 + alarmMinute
                     val targetTotal = targetHour * 60 + targetMinute
                     if (alarmTotal >= targetTotal) { showTimeError = true; return@Surface }
+                    // 출근 경로 검증 — 정류장/역·노선이 없으면 저장 차단하고 무엇이 빈지 안내.
+                    if (savedSettings.missionTransitType == MissionTransitType.NONE ||
+                        savedSettings.missionStopId.isBlank()
+                    ) {
+                        validationError = "출근 경로의 정류장·역을 먼저 선택해 주세요"; return@Surface
+                    }
+                    if (savedSettings.missionRoutes.isEmpty()) {
+                        validationError = "출근 경로의 노선을 먼저 선택해 주세요"; return@Surface
+                    }
                     viewModel.saveSettings(
                         savedSettings.copy(
                             alarmHour = alarmHour, alarmMinute = alarmMinute,

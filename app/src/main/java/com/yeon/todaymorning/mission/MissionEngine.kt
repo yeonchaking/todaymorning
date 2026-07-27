@@ -71,6 +71,7 @@ class MissionEngine @Inject constructor(
     @Volatile private var started = false
     private var countdownJob: Job? = null
     private var pollingJob: Job? = null
+    private var sessionTimeoutJob: Job? = null
     private var tts: TtsManager? = null
 
     private val _arrivals = MutableStateFlow<List<TransitArrival>>(emptyList())
@@ -112,28 +113,37 @@ class MissionEngine @Inject constructor(
 
         startCountdown()
         startPolling()
+        startSessionTimeout()
+    }
+
+    /**
+     * 목표 시각(오늘 기준, 자정 넘김 롤오버 반영)을 epoch millis 로 계산.
+     *
+     * 자정 넘김 롤오버(2026-07-12): 기본 계산은 항상 "오늘 날짜" 기준이라, 알람 23:50 →
+     * 목표 00:10 같은 심야 조합이면 target 이 약 -24시간 과거로 잡혀 화면이 열리자마자
+     * "시간이 지났어요"가 됐다. 목표가 지금보다 임계값 이상 과거면 "오늘 이미 지난 것"이
+     * 아니라 "자정 넘겨 내일 도래"로 보고 하루를 더한다. 임계값 3시간인 이유: 알람→목표
+     * 간격은 보통 1~2시간이라, 이보다 작게 잡으면 "목표 직후 재진입해 수동 성공/실패를
+     * 고르는" 의도된 케이스까지 내일로 밀어버린다. (AlarmScheduler.nextDailyTrigger 는
+     * 이미 같은 롤오버 처리가 있음.)
+     */
+    private fun targetMillis(s: com.yeon.todaymorning.domain.model.UserSettings): Long {
+        var target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, s.targetHour)
+            set(Calendar.MINUTE, s.targetMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        if (target < System.currentTimeMillis() - MIDNIGHT_ROLLOVER_THRESHOLD_MS) {
+            target += 24 * 60 * 60 * 1000L
+        }
+        return target
     }
 
     private fun startCountdown() {
         countdownJob = scope.launch {
             val s = dataStore.userSettings.first()
-            var target = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, s.targetHour)
-                set(Calendar.MINUTE, s.targetMinute)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-
-            // 자정 넘김 롤오버(2026-07-12): 위 계산은 항상 "오늘 날짜" 기준이라, 알람 23:50 →
-            // 목표 00:10 같은 심야 조합이면 target 이 약 -24시간 과거로 잡혀 화면이 열리자마자
-            // "시간이 지났어요"가 됐다. 목표가 지금보다 임계값 이상 과거면 "오늘 이미 지난 것"이
-            // 아니라 "자정 넘겨 내일 도래"로 보고 하루를 더한다. 임계값 3시간인 이유: 알람→목표
-            // 간격은 보통 1~2시간이라, 이보다 작게 잡으면 "목표 직후 재진입해 수동 성공/실패를
-            // 고르는" 의도된 케이스까지 내일로 밀어버린다. (AlarmScheduler.nextDailyTrigger 는
-            // 이미 같은 롤오버 처리가 있음 — 이 계산만 빠져 있었다.)
-            if (target < System.currentTimeMillis() - MIDNIGHT_ROLLOVER_THRESHOLD_MS) {
-                target += 24 * 60 * 60 * 1000L
-            }
+            val target = targetMillis(s)
 
             while (true) {
                 val now = System.currentTimeMillis()
@@ -165,6 +175,27 @@ class MissionEngine @Inject constructor(
                     if (_missionState.value != MissionState.Active || _finished.value) return@launch
                 }
                 fetchArrivals()
+            }
+        }
+    }
+
+    /**
+     * 세션 최대시간 워치독 — 목표 시각이 지나도 사용자가 성공/실패를 안 고르면 세션이
+     * 무한정 열려 있게 된다(폴링·서비스 계속 유지). 목표 + [MAX_SESSION_MS] 시점까지도
+     * 여전히 [MissionState.Active] 면 미선택으로 보고 실패로 마감한다([onMissionFail]).
+     * 카운트다운 표시 로직은 건드리지 않도록 별도 코루틴으로 감시한다.
+     */
+    private fun startSessionTimeout() {
+        sessionTimeoutJob = scope.launch {
+            val s = dataStore.userSettings.first()
+            val deadline = targetMillis(s) + MAX_SESSION_MS
+            while (System.currentTimeMillis() < deadline) {
+                if (_missionState.value != MissionState.Active) return@launch
+                delay(1000L)
+            }
+            // deadline 도달 — 아직 사용자가 결정을 안 했으면 실패로 자동 마감.
+            if (_missionState.value == MissionState.Active) {
+                onMissionFail()
             }
         }
     }
@@ -357,12 +388,16 @@ class MissionEngine @Inject constructor(
         started = false
         countdownJob?.cancel(); countdownJob = null
         pollingJob?.cancel(); pollingJob = null
+        sessionTimeoutJob?.cancel(); sessionTimeoutJob = null
         runCatching { tts?.shutdown() }
         tts = null
     }
 
     companion object {
-        /** 자정 넘김 판정 임계값 — startCountdown 주석 참고. */
+        /** 자정 넘김 판정 임계값 — targetMillis 주석 참고. */
         private const val MIDNIGHT_ROLLOVER_THRESHOLD_MS = 3 * 60 * 60 * 1000L
+
+        /** 세션 최대시간 — 목표 시각 이후 이 시간까지 미선택이면 실패로 자동 마감(초기 30분). */
+        private const val MAX_SESSION_MS = 30 * 60 * 1000L
     }
 }
