@@ -39,6 +39,8 @@
 - [x] ~~**API 키·한도 정책 확정**~~ — 해결(2026-07-06). 릴리즈 빌드에 공공 API 키 내장(`BUS_API_KEY`/`SUBWAY_API_KEY`) + 하루 트래픽 한도 존재(개발계정 기준 기능별 일일 1,000건, 모든 사용자가 앱에 내장된 같은 키를 공유하는 구조라 클로즈드 테스트만으로도 한도 초과 우려 있었음). **data.go.kr 운영계정 전환 + 트래픽 증설 완료**로 해소. 사용자가 더 늘면 서버 캐싱 프록시 도입을 장기 확장 포인트로 남겨둠(상세는 `구글 플레이 콘솔 업로드 준비(오늘도출근).md`).
 - [x] ~~**엣지케이스 (자정 넘김 롤오버 버그)**~~ — 해결(2026-07-12). `MissionEngine.startCountdown()`에 롤오버 추가: 목표가 지금보다 `MIDNIGHT_ROLLOVER_THRESHOLD_MS`(3시간) 이상 과거로 계산되면 +24h. 3시간인 이유(목표 직후 재진입하는 의도된 케이스와의 분리)는 코드 주석에 기록. 나머지 두 케이스(미션 미설정 알람·목표 직전 진입)는 기존 확인대로 변경 불필요.
 - [ ] **타임어택 신호등 정밀화** `[P3]` — 현재 "남은 시간"만으로 여유/곧출발/임박 판정(`TimeAttackScreen`의 `signal` when절). "다음 버스가 목표 시각 내 도착 가능한지"까지 반영하면 더 정확(이미 계산돼 있는 `lastBoardableSeconds`를 신호등 색상에도 연결). 2026-07-06 세션: P3(우선순위 낮음)로 보류.
+- [x] ~~**미션 설정 저장 검증**~~ — 해결(2026-07-27). `SettingsScreen` 저장 버튼에 출근 경로 검증 추가: 정류장·역(`missionTransitType`/`missionStopId`) 또는 노선(`missionRoutes`)이 비면 저장을 막고 무엇이 비었는지 스낵바로 안내(`validationError`). 기존 알람<목표 시각 검증(`showTimeError`)은 그대로 유지.
+- [x] ~~**세션 최대시간 초과 시 자동 종료(초기 30분)**~~ — 해결(2026-07-27). `MissionEngine`에 워치독 코루틴(`startSessionTimeout`) 추가: 목표 시각 + `MAX_SESSION_MS`(30분)까지도 `MissionState.Active`면 미선택으로 보고 `onMissionFail()`로 실패 마감. 카운트다운 표시는 안 건드리도록 별도 코루틴으로 감시, 목표 계산은 `targetMillis` 헬퍼로 추출(롤오버 재사용). 최대시간 30분은 상수 고정 — 설정화는 추후 항목으로 남김.
 
 ---
 
@@ -50,6 +52,7 @@
 - [x] ~~**상태별 UI 일관성 점검**~~ — 해결(2026-07-06). `RouteSelectScreen`/`BusSelectScreen`(노선 바텀시트)/`LocationPickerScreen`(주소검색 다이얼로그)이 로딩·빈·에러 상태에서 M3 기본 색(`MaterialTheme.colorScheme`)을 쓰고 있어 `TimeAttackScreen`/`MainActivity`(ArrivalDialog)의 `AppTheme.colors` 톤과 어긋나 있었음. 공통 컴포저블 `ui/common/StateViews.kt`(`SectionLoading`/`InlineLoading`/`EmptyStateText`/`ErrorStateText`) 신설해 세 화면에 적용, 전부 `AppTheme.colors` 기반으로 통일.
 - [x] ~~**플로팅 위젯 주석처리 (기능 비활성화)**~~ — 해결(2026-07-12). 순수 주석처리(기능 플래그 대신 — 사용자 결정): Manifest `SYSTEM_ALERT_WINDOW` 제거, `MissionOverlay.kt` 전체 주석, `MissionService`/`TimeAttackScreen` 위젯 로직 주석(알림 갱신은 유지). 전 파일 공통 마커 `// 1.0 릴리즈: 플로팅 위젯 비활성화`로 검색 한 번에 복원 지점 확인 가능. DataStore 키·ViewModel setter는 P2 재활성화 대비 보존.
 - [ ] **플로팅 위젯 재활성화 + 우리 앱이 전면일 때 숨기기** `[P2]` — 재도입 시 "오버레이가 미션 화면 위에도 겹쳐 뜨는" 문제(전면 숨김) 함께 처리.
+- [ ] **홈 위젯 on/off 스위치** — 홈 화면 앱 위젯으로 미션/알람을 켜고 끄는 토글 제공(앱을 열지 않고 바로 on/off). ※ 스펙 확정 필요: 대상이 알람 활성화인지 미션 자체인지, 위젯 표시 정보(다음 알람 시각 등) 범위. (기존 "플로팅 위젯 재활성화"[52행]와는 별개 — 그건 오버레이, 이건 런처 앱 위젯.)
 - [ ] **다듬기** `[P2]` — 폰트 스케일·접근성(contentDescription), 결과 화면 시각 정리. (Jua/Pretendard 등 폰트는 현재 시스템 폰트 — 적용 시 다운로더블/번들.) 다크모드 점검은 완료(2026-07-10 실기기 확인, 깨짐 없음).
 
 ---
@@ -72,9 +75,17 @@
 
 > 간단한 작업·테스트·나중에 하기로 정한 것.
 
-- [ ] **`SCHEDULE_EXACT_ALARM`에 `maxSdkVersion="32"` 부여** — 현재 Manifest에 `SCHEDULE_EXACT_ALARM`·`USE_EXACT_ALARM`이 둘 다 무조건 선언돼 있음(2026-07-12 선언서 작업 중 발견). API 33+는 `USE_EXACT_ALARM`이 커버(자동 부여)하므로 표준 패턴은 `SCHEDULE_EXACT_ALARM`에 `android:maxSdkVersion="32"`. 동작엔 문제없으나 심사 지적 가능성. 한 줄 수정.
-- [ ] **OkHttp 로그 serviceKey 마스킹** — 릴리즈의 BASIC 로깅도 URL은 찍는데 공공 API 키가 URL 쿼리 파라미터라 릴리즈 로그캣에 키가 그대로 노출됨(2026-07-12 로그 분석 중 발견 — "릴리즈엔 키 안 찍힘"이라던 기존 판단은 절반만 맞았음). 로깅 인터셉터에서 `serviceKey` 값 마스킹.
+- [x] ~~**`SCHEDULE_EXACT_ALARM`에 `maxSdkVersion="32"` 부여**~~ — 해결(2026-07-21, v1.5). Manifest의 `SCHEDULE_EXACT_ALARM`에 `android:maxSdkVersion="32"` 부여(API 33+는 `USE_EXACT_ALARM`이 커버). 동작 변화 없이 심사 지적 소지 제거.
+- [x] ~~**OkHttp 로그 serviceKey 마스킹**~~ — 해결(2026-07-21, v1.5). `NetworkModule`의 `HttpLoggingInterceptor`에 커스텀 `Logger` 주입해 출력 문자열만 치환: 버스·기타 공공 API `serviceKey=` 쿼리 파라미터, 지하철 API 경로 내 키(`/api/subway/{key}/json/`) 둘 다 `***` 처리. 실제 요청 URL엔 영향 없음.
 - [x] ~~OkHttp 로깅 레벨 BODY → BASIC 환원~~ — 해결(2026-07-06). `NetworkModule.buildOkHttpClient()`에서 `BuildConfig.DEBUG` 분기로 디버그는 BODY 유지, 릴리즈는 BASIC(URL·상태코드만) — API 키·응답 본문이 릴리즈 로그캣에 안 찍힘.
 - [x] ~~**🔊 안내 토스트 정리**~~ — 결정(2026-07-06). `MissionEngine.maybeAnnounce`의 `🔊 N분 전 안내` 토스트는 실제 TTS 발화와 같은 조건 블록에서 동시에 뜨는 것으로 확인 — 음성 안내가 나오는 순간 화면에도 같은 문구가 잠깐 뜨는 용도라 그대로 유지하기로 함. 코드 변경 없음.
 - [x] ~~**성공 시 자동실패 취소 도입 시 주의**~~ — 이동(2026-07-10). 작업이 아닌 주의사항이라 `잠재리스크(오늘도출근).md`로 이동.
 - [x] ~~**목표 시각 경과 시 TTS/폴링/서비스가 조기 종료되는 버그**~~ — 해결(2026-07-06). 위 항목을 논의하다 발견: `MissionEngine.startCountdown()`이 `remaining <= 0`이 되는 즉시 `markFinished()`를 불러 `_finished=true`로 만들었고, 이게 `startPolling()` 루프(도착 폴링·TTS 트리거)와 `MissionService.watchFinished()`(서비스 자체 종료)를 동시에 멈췄다. 이 앱은 목표 시각을 살짝 넘겨 도착하는 차편도 "타면 성공"으로 인정해 하단 액션을 성공/실패 수동 선택으로 바꾸는 설계인데(`TimeAttackScreen`), 정작 그 순간 도착정보 갱신·TTS·백그라운드 서비스가 죽어버려 사용자가 결정하는 동안 안내가 끊겼음. 수정: 목표 시각 경과는 카운트다운만 멈추고(`markFinished()` 호출 제거), 실제 종료는 `onBoardingSuccess()`/`onMissionFail()`(사용자가 직접 성공/실패를 고르는 시점)에서만 일어나도록 함.
+
+---
+
+## Phase 4 — 날씨 기능 (1.0 이후)
+
+> 1.0 릴리즈 이후 확장 기능. 세부 스펙 미확정 — 아이디어 단계.
+
+- [ ] **날씨 기능 추가** — 출근 미션에 그날 날씨 정보를 연동(예: 미션/알람 시점 기준 강수·기온 안내). 데이터 소스(기상청 단기예보 API 등), 표시 위치(홈 카드/타임어택/알람 안내 TTS), 위치 기준(정류장 좌표 재사용 가능) 등 세부 결정 필요.

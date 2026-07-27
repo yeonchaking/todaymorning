@@ -25,7 +25,7 @@ kotlin {
 }
 
 // 앱 버전 (버전 올릴 때 여기만 수정)
-val appVersionName = "1.4"
+val appVersionName = "1.6"
 
 // 빌드 산출물 파일명: todaymorning-v1.0-20260712-release.aab
 base {
@@ -44,7 +44,7 @@ android {
         applicationId = "com.yeon.todaymorning"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
+        versionCode = 7
         versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
